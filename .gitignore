@@ -1,0 +1,31 @@
+# --- Python ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+*.db
+celerybeat-schedule*
+
+# --- Node / frontend ---
+node_modules/
+dist/
+build/
+
+# --- Editors / OS ---
+.DS_Store
+.idea/
+.vscode/
+
+# --- Logs ---
+*.log

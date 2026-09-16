@@ -1,0 +1,14 @@
+[
+  {"text":"I want a refund for order #ORD-1001","expected_category":"refund_request"},
+  {"text":"You charged me twice for my order","expected_category":"refund_request"},
+  {"text":"Can you tell me your store hours?","expected_category":"customer_inquiry"},
+  {"text":"I am interested in your premium plan and need a quote","expected_category":"lead_inquiry"},
+  {"text":"My account is broken and I need support","expected_category":"support_request"},
+  {"text":"I have a question about my invoice","expected_category":"invoice_order"},
+  {"text":"Please give me my money back for order ABC-88","expected_category":"refund_request"},
+  {"text":"What is your return policy?","expected_category":"customer_inquiry"},
+  {"text":"We are interested in the enterprise package","expected_category":"lead_inquiry"},
+  {"text":"The checkout page is broken and shows an error","expected_category":"support_request"},
+  {"text":"There is a problem with my order invoice","expected_category":"invoice_order"},
+  {"text":"Hello, I would like more information","expected_category":"customer_inquiry"}
+]

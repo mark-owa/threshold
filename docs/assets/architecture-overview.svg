@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="850" viewBox="0 0 1400 850" role="img" aria-labelledby="title desc">
+  <title id="title">Threshold reference architecture</title>
+  <desc id="desc">The React dashboard calls the FastAPI application. The workflow engine validates requests, applies policy and approvals, and stores business state in PostgreSQL. An optional queued endpoint sends tasks to Redis. Celery Beat schedules retry tasks through Redis, and a worker invokes the same engine. AI uses a deterministic mock by default; payment and notification effects are local records.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/></marker>
+    <marker id="teal-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#0f766e"/></marker>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #0f172a; }
+      .heading { font-size: 25px; font-weight: 700; }
+      .body { font-size: 19px; fill: #334155; }
+      .label { font-size: 16px; font-weight: 700; fill: #475569; }
+      .route { fill: none; stroke: #475569; stroke-width: 3; marker-end: url(#arrow); }
+      .optional { fill: none; stroke: #0f766e; stroke-width: 3; stroke-dasharray: 8 5; marker-end: url(#teal-arrow); }
+    </style>
+  </defs>
+  <rect width="1400" height="850" rx="24" fill="#f8fafc"/>
+  <rect x="0" y="0" width="1400" height="8" fill="#0f766e"/>
+  <text x="50" y="64" font-size="17" font-weight="700" letter-spacing="3" fill="#0f766e">THRESHOLD</text>
+  <text x="50" y="109" font-size="38" font-weight="700">A request, a controlled decision, a recorded outcome.</text>
+  <text x="50" y="145" class="body">Reference architecture · local demonstration · database-only mock effects</text>
+
+  <rect x="50" y="205" width="340" height="178" rx="15" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="74" y="245" class="heading">Operator dashboard</text>
+  <text x="74" y="282" class="body">React interface</text>
+  <text x="74" y="313" class="body">Approvals and manual retries</text>
+  <text x="74" y="344" class="body">Execution and audit inspection</text>
+
+  <rect x="510" y="205" width="380" height="178" rx="15" fill="#ecfdf5" stroke="#0f766e" stroke-width="2"/>
+  <text x="534" y="245" class="heading">API + workflow engine</text>
+  <text x="534" y="282" class="body">JWT and tenant checks</text>
+  <text x="534" y="313" class="body">Policy, approval, idempotency</text>
+  <text x="534" y="344" class="body">AI fields: mock by default</text>
+
+  <rect x="1010" y="205" width="340" height="178" rx="15" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="1034" y="245" class="heading">PostgreSQL</text>
+  <text x="1034" y="282" class="body">Events and workflow steps</text>
+  <text x="1034" y="313" class="body">Approvals and action records</text>
+  <text x="1034" y="344" class="body">Policy, audit, and retry state</text>
+
+  <path d="M390 293 H510" class="route"/>
+  <text x="450" y="268" text-anchor="middle" class="label">HTTP / JWT</text>
+  <path d="M890 293 H1010" class="route"/>
+  <text x="950" y="268" text-anchor="middle" class="label">Read / write</text>
+
+  <rect x="50" y="527" width="340" height="150" rx="15" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="74" y="568" class="heading">Celery Beat</text>
+  <text x="74" y="607" class="body">Schedules due-retry checks</text>
+  <text x="74" y="638" class="body">Once per minute</text>
+
+  <rect x="510" y="527" width="380" height="150" rx="15" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="534" y="568" class="heading">Redis</text>
+  <text x="534" y="607" class="body">Task broker and result backend</text>
+  <text x="534" y="638" class="body">Separate from business records</text>
+
+  <rect x="1010" y="527" width="340" height="150" rx="15" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="1034" y="568" class="heading">Celery worker</text>
+  <text x="1034" y="607" class="body">Queued event processing</text>
+  <text x="1034" y="638" class="body">Eligible action retries</text>
+
+  <path d="M700 383 V527" class="optional"/>
+  <rect x="603" y="442" width="194" height="25" fill="#f8fafc"/>
+  <text x="700" y="460" text-anchor="middle" class="label">Optional queue endpoint</text>
+  <path d="M390 601 H510" class="optional"/>
+  <text x="450" y="579" text-anchor="middle" class="label">Enqueue</text>
+  <path d="M890 601 H1010" class="optional"/>
+  <text x="950" y="579" text-anchor="middle" class="label">Tasks</text>
+  <path d="M1180 527 V423 H847 V383" class="optional"/>
+  <rect x="930" y="407" width="238" height="29" fill="#f8fafc"/>
+  <text x="1049" y="428" text-anchor="middle" class="label">Invokes the same engine</text>
+
+  <path d="M50 731 H1350" stroke="#cbd5e1" stroke-width="1"/>
+  <text x="50" y="771" class="body">Solid: dashboard demo path. Dashed: queued processing and scheduled retry paths.</text>
+  <text x="50" y="805" class="body">Live AI adapters are optional. Native broker durability and real-provider recovery are not established.</text>
+</svg>

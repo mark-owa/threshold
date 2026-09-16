@@ -1,0 +1,7 @@
+-r requirements.txt
+
+pytest==9.1.1
+pytest-cov==7.1.0
+Faker==40.36.0
+ruff==0.16.1
+mypy==2.3.0

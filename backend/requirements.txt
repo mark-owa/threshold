@@ -1,0 +1,39 @@
+# Top-level direct dependencies only, pinned to versions verified to
+# install and pass the test suite together. For stricter reproducibility
+# in a real production deployment, generate a fully resolved lockfile
+# with `pip freeze` or `uv pip compile` from this file.
+
+# --- Web framework ---
+fastapi==0.141.1
+uvicorn[standard]==0.52.1
+python-multipart==0.0.32
+
+# --- Validation / config ---
+pydantic[email]==2.13.4
+pydantic-settings==2.14.2
+
+# --- Database ---
+sqlalchemy==2.0.51
+alembic==1.18.5
+psycopg[binary]==3.3.4
+
+# --- Queue / background jobs ---
+redis==8.1.0
+celery==5.6.3
+
+# --- Reliability ---
+tenacity==9.1.4
+
+# --- Observability ---
+structlog==26.1.0
+
+# --- Auth ---
+pyjwt==2.13.0
+bcrypt==5.0.0
+
+# --- HTTP client (outbound integrations, generic REST action) ---
+httpx==0.28.1
+
+# --- AI providers (lazy-imported; demo mode needs neither) ---
+openai==2.53.0
+anthropic==0.120.2

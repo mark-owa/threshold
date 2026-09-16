@@ -1,0 +1,7 @@
+[
+  {"text":"Please refund order #ORD-1001 for $65.00", "order_number":"ORD-1001", "amount_usd":65.0},
+  {"text":"Refund order ABC-88 for USD 120", "order_number":"ABC-88", "amount_usd":120.0},
+  {"text":"I need my money back", "order_number":null, "amount_usd":null},
+  {"text":"Please refund order #ORD-9", "order_number":"ORD-9", "amount_usd":null},
+  {"text":"Refund $19.95 for order XYZ-22", "order_number":"XYZ-22", "amount_usd":19.95}
+]
