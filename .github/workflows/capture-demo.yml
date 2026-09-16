@@ -1,0 +1,85 @@
+name: Capture portfolio demo
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/capture-demo.yml'
+      - 'tooling/capture/**'
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      COMPOSE_PROJECT_NAME: threshold-capture
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Start disposable Docker demo
+        run: |
+          cp .env.example .env
+          docker compose up -d --build postgres redis backend frontend
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://localhost:5173/health; then break; fi
+            sleep 2
+          done
+          curl -fsS http://localhost:5173/health
+          docker compose exec -T backend alembic upgrade head
+          docker compose exec -T backend python -m scripts.seed_demo_org
+          # Beat is deliberately absent: the video demonstrates manual recovery.
+
+      - name: Install capture tools
+        working-directory: tooling/capture
+        run: |
+          npm install --no-package-lock
+          npx playwright install --with-deps chromium
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+
+      - name: Record real UI and verify outcomes
+        working-directory: tooling/capture
+        run: node capture.mjs
+
+      - name: Upload verified demo media
+        uses: actions/upload-artifact@v4
+        with:
+          name: threshold-demo
+          path: tooling/capture/output/publish/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Collect runtime details
+        if: always()
+        run: |
+          mkdir -p capture-diagnostics
+          docker compose ps > capture-diagnostics/services.txt
+          docker compose logs --no-color > capture-diagnostics/compose.log
+          docker version > capture-diagnostics/docker.txt
+          docker compose exec -T backend python --version > capture-diagnostics/python.txt || true
+          docker compose exec -T postgres postgres --version > capture-diagnostics/postgres.txt || true
+          docker compose exec -T redis redis-server --version > capture-diagnostics/redis.txt || true
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: threshold-capture-diagnostics
+          path: |
+            capture-diagnostics/
+            tooling/capture/output/failure.png
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Stop disposable demo
+        if: always()
+        run: docker compose down --volumes
