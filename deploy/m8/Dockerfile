@@ -7,14 +7,18 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl tar \
+    && apt-get install -y --no-install-recommends curl ca-certificates coreutils tar \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system threshold \
     && useradd --system --gid threshold --home /app threshold
 
-COPY threshold_m8_backend_runtime.tar.gz /tmp/threshold-runtime.tar.gz
-RUN tar -xzf /tmp/threshold-runtime.tar.gz -C /app \
-    && rm /tmp/threshold-runtime.tar.gz \
+COPY runtime.b64.part-* /tmp/runtime-parts/
+
+RUN cat /tmp/runtime-parts/runtime.b64.part-* \
+    | base64 -d > /tmp/runtime.tar.gz \
+    && echo "7ecf6c3b6bb1cf493c9145a4de8f47d3a4373d49ee1815a92bf07aca57846338  /tmp/runtime.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/runtime.tar.gz -C /app \
+    && rm -rf /tmp/runtime-parts /tmp/runtime.tar.gz \
     && pip install -r /app/requirements.txt \
     && chown -R threshold:threshold /app
 
