@@ -35,9 +35,10 @@ Work:
 
 Exit criteria:
 - Frontend loads over HTTPS.
-- No fatal browser console errors.
-- API health is reachable from the deployed origin.
-- Authentication UI is functional.
+- No fatal browser-visible errors during navigation smoke test.
+- API health/readiness are reachable from the deployed application.
+- Seeded staging authentication succeeds.
+- Overview, Approvals, Executions, Actions, Recovery, Policies, Integrations, Team, Billing & usage, Beta readiness, Audit log, and Demo sandbox all open successfully.
 
 ## Milestone 2 — Core SaaS smoke test
 **Status: IN PROGRESS**
