@@ -3,3 +3,5 @@
 !runtime.b64.part-*
 !frontend_index.html
 !staging_entry.py
+!scripts/
+!scripts/**
