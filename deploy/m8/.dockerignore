@@ -12,3 +12,4 @@
 !worker_supervisor.py
 !beat_supervisor.py
 !apply_readiness_head_patch.py
+!apply_vault_read_support.py
