@@ -80,3 +80,61 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: npm run build
+
+
+  m8-runtime:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: threshold
+          POSTGRES_PASSWORD: threshold_test_password
+          POSTGRES_DB: threshold_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U threshold -d threshold_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://threshold:threshold_test_password@localhost:5432/threshold_test
+      APP_ENV: development
+      SECRET_KEY: ci-m8-secret-please-override-in-prod-env
+      REDIS_URL: redis://localhost:6379/0
+      CELERY_BROKER_URL: redis://localhost:6379/1
+      CELERY_RESULT_BACKEND: redis://localhost:6379/2
+      WEBHOOK_SIGNING_SECRET: ci-m8-webhook-secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build deployed M8 runtime image
+        run: docker build -t threshold-m8-ci ./deploy/m8
+
+      - name: Run M8 migrations
+        run: |
+          docker run --rm --network host \
+            -e DATABASE_URL -e APP_ENV -e SECRET_KEY \
+            -e REDIS_URL -e CELERY_BROKER_URL -e CELERY_RESULT_BACKEND \
+            -e WEBHOOK_SIGNING_SECRET \
+            threshold-m8-ci alembic upgrade head
+
+      - name: Run M8 SaaS and RBAC regression tests
+        run: |
+          docker run --rm --network host \
+            -e DATABASE_URL -e APP_ENV -e SECRET_KEY \
+            -e REDIS_URL -e CELERY_BROKER_URL -e CELERY_RESULT_BACKEND \
+            -e WEBHOOK_SIGNING_SECRET \
+            -v "${{ github.workspace }}/m8_tests:/tmp/m8_tests:ro" \
+            threshold-m8-ci sh -lc \
+            "pip install pytest==9.1.1 pytest-cov==7.1.0 Faker==40.36.0 >/dev/null && pytest -q /tmp/m8_tests"
