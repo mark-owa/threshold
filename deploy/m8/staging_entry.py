@@ -1,7 +1,22 @@
 from fastapi import Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from app.main import app
+
+
+# Staging-only additive CORS entry for the temporary validation console.
+# The application's configured CORS_ORIGINS remains untouched; this outer
+# middleware only adds the exact preview origin needed for staging validation.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://threshold-staging-console-odrgx1fhm-markjoshuagalit2-3620.vercel.app",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.middleware("http")
