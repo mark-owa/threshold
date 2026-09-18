@@ -63,10 +63,7 @@ http://localhost:8000/docs. `/health` checks the API process; `/ready` checks th
 database connection. `make seed-history` adds examples across all five categories.
 
 Try **Low-risk refund**, **High-risk refund**, and **Failure + retry**. A
-**Policy-failing refund** enters the approval queue; use Reject to demonstrate
-cancellation. A reviewer may override the automatic policy gate, but the action
-still requires an existing order and a positive amount no greater than its total.
-Missing amounts require review and modification; they are never inferred as zero.
+**Policy-failing refund** enters the approval queue because deterministic rules mark it ineligible; no action executes unless a human explicitly overrides the exception. Reject demonstrates the terminal cancellation path.
 
 Failure + retry creates a fresh mock order so an earlier successful refund cannot
 hide the simulated timeout. It records a failed workflow and a scheduled action;
