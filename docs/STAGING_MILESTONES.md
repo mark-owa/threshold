@@ -81,7 +81,7 @@ Exit criteria:
 - No cross-workspace data leakage observed.
 
 ## Milestone 3 — Controlled workflow end-to-end
-**Status: IN PROGRESS**
+**Status: PASS**
 
 Evidence so far:
 - Low-risk refund demo execution `5907e7b5-bfce-4796-992b-17baa6dc5791`: completed; all 8 workflow steps succeeded; mock action succeeded and verification passed.
