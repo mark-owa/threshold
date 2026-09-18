@@ -107,16 +107,26 @@ Exit criteria:
 - Duplicate/idempotent path proven.
 
 ## Milestone 4 — Shopify development integration
-**Status: TODO**
+**Status: IN PROGRESS**
 
-Requires user-owned Shopify development credentials/store.
+Code-hardening evidence (2026-09-18):
+- Current Shopify OAuth/webhook requirements were rechecked against official Shopify documentation.
+- Added anchored `<shop>.myshopify.com` validation rather than suffix-only validation.
+- OAuth callback HMAC is verified before callback parameters are trusted.
+- OAuth nonce consumption now uses a row lock to reduce replay races.
+- Granted OAuth scopes are validated and recorded.
+- OAuth-managed webhooks use the Shopify app client secret for raw-body HMAC verification.
+- `X-Shopify-Shop-Domain` is normalized and bound to the configured shop before accepting a webhook.
+- Targeted Shopify tests passed 4/4 and the patched modules compiled.
+- The fail-closed build overlay was deployed successfully on Railway.
 
-Work:
-- Validate current OAuth callback/HMAC behavior against current Shopify rules.
-- Install into a development store.
-- Validate nonce consumption and granted scopes.
-- Receive and verify a real webhook.
-- Fetch canonical order data through Admin GraphQL.
+Still required before PASS:
+- User-owned Shopify development app/store credentials.
+- Live OAuth install against a development store.
+- Real signed webhook delivery.
+- Canonical Admin GraphQL order sync.
+- Runtime credential/vault read support for OAuth-written merchant tokens.
+- Expiring offline-token refresh lifecycle where required.
 
 Exit criteria:
 - OAuth install succeeds.
@@ -124,15 +134,24 @@ Exit criteria:
 - Canonical order sync succeeds.
 
 ## Milestone 5 — Stripe test integration and billing
-**Status: TODO**
+**Status: IN PROGRESS**
 
-Requires user-owned Stripe test credentials.
+Code-hardening evidence (2026-09-18):
+- Current Stripe webhook, idempotency and refund behavior was rechecked against Stripe documentation.
+- Refund references are provider-specific: `pi_...` maps to PaymentIntent and `ch_...` maps to Charge; invalid references fail closed.
+- The current prototype refund path explicitly rejects non-USD currency rather than silently misinterpreting amounts.
+- Transport failures, HTTP 408 and HTTP 5xx are treated as `UNKNOWN` for reconciliation instead of blind duplicate-prone retries.
+- HTTP 409/429 remain retryable.
+- Checkout completion no longer blindly marks a subscription active.
+- Subscription webhook handling records Stripe event creation time/ID and ignores older stale subscription events.
+- Targeted Stripe provider tests passed 6/6 plus stale-event helper and compile checks.
+- Stripe hardening was deployed to the API and to the Worker, where provider side effects execute.
 
-Work:
-- Configure Stripe test-mode secrets.
-- Verify billing webhook signature and event dedupe.
-- Run test checkout/customer-portal flow where applicable.
-- Run a test refund with correct provider reference semantics.
+Still required before PASS:
+- User-owned Stripe test-mode credentials/account.
+- Test billing webhook and duplicate-delivery proof.
+- Test checkout/customer-portal flow where applicable.
+- Test refund + verification/reconciliation against Stripe test mode.
 
 Exit criteria:
 - Test billing event is persisted exactly once.
@@ -140,15 +159,32 @@ Exit criteria:
 - Duplicate delivery does not duplicate business effect.
 
 ## Milestone 6 — Failure and recovery drills
-**Status: TODO**
+**Status: IN PROGRESS**
 
-Work:
-- Worker restart/crash.
-- Redis interruption/recovery.
-- Provider transient failure.
-- Provider commit + client timeout -> UNKNOWN -> reconciliation.
-- Stale retry / duplicate delivery.
-- Outbox retry and dead-letter path.
+Passed staging evidence:
+- Worker replacement/restart: PASS. A replacement Celery worker connected to Redis and resumed successful `threshold.dispatch_outbox` consumption.
+- A real Redis redeploy exposed a resilience defect: stock Celery 5.6.3 could keep the process alive while no longer consuming after broker loss.
+- Added explicit Celery retry/keepalive configuration plus Redis-aware Worker and Beat supervisors.
+- Worker supervisor watches Celery output for broker-loss signals, recycles the stuck child, waits for Redis, then starts a fresh worker.
+- Beat supervisor recycles on Redis loss or a stale dispatch heartbeat.
+- Final Redis interruption drill: PASS end-to-end.
+  - Beat detected broker loss and recycled.
+  - Worker detected broker loss and recycled.
+  - Both waited while Redis was unavailable.
+  - After Redis returned, Beat restarted and resumed the 5-second `dispatch_outbox` heartbeat.
+  - Worker reconnected, became ready, then received and successfully completed the resumed `dispatch_outbox` tasks without manual service restart.
+- Redis volume remained attached; no database/Redis data was deleted.
+
+Key recovery deployments:
+- Worker supervisor deployment: `5ac87954-e290-4df2-aa1a-f2b56f0cbf28`.
+- Beat supervisor deployment: `0d71e4e3-944e-4709-9b47-b9f8fed764cc`.
+- Final Redis cutover deployment: `405e67d6-e92f-43d5-a7fb-ddb294380507`.
+
+Still required before PASS:
+- Provider transient-failure drill.
+- Provider commit + client timeout -> `UNKNOWN` -> reconciliation drill.
+- Explicit duplicate-delivery/idempotency replay proof.
+- Explicit outbox retry/dead-letter drill.
 
 Exit criteria:
 - No duplicate side effects.
@@ -157,28 +193,46 @@ Exit criteria:
 - Failures remain visible/auditable.
 
 ## Milestone 7 — Backup, restore and observability
-**Status: TODO**
+**Status: IN PROGRESS**
 
-Work:
-- Create staging database backup.
-- Restore into a safe staging target/drill.
-- Verify authoritative state after restore.
-- Configure useful application/worker availability alerts.
-- Record incident owner and restore evidence.
+Observability evidence:
+- Railway resource metrics were captured for API, Worker, Beat, Postgres and Redis.
+- Current staging resource usage is light relative to the 1 GB service memory limits.
+- A recurring Threshold staging health watch is enabled to check `/health` and `/health/ready` and notify only on meaningful failures.
+- Do not set `BETA_ALERTING_CONFIGURED=true` until an alert has actually fired/tested successfully.
+
+Backup/restore status:
+- Railway documentation confirms manual/scheduled volume backups and Postgres PITR are supported.
+- PITR restore creates a new sibling Postgres service and leaves the source untouched.
+- The connected Railway API tool does not expose manual volume-backup creation.
+- Browser automation could not create a manual backup because that Railway browser session was not authenticated.
+- No backup or restore was fabricated and no restore was attempted against the live staging database.
+
+Still required before PASS:
+- Create a real Postgres backup.
+- Restore into a safe isolated target/fork, never over the source during the drill.
+- Verify authoritative Threshold state after restore.
+- Record the restore timestamp/evidence.
+- Trigger/test at least one operational alert.
+- Record an incident/on-call owner.
 
 Exit criteria:
 - Successful documented restore drill.
 - Restore timestamp recorded.
-- Operational alerts/evidence exist.
+- Operational alert evidence exists.
 
 ## Milestone 8 — Beta readiness gate
-**Status: TODO**
+**Status: IN PROGRESS**
 
 Work:
 - Run the M8 beta-readiness gate against real staging evidence.
 - Resolve every BLOCK item.
 - Review WARN items explicitly.
 - Keep live execution disabled until gate passes.
+
+Hard rule:
+- Do not set restore/alerting/on-call evidence flags unless the corresponding evidence actually exists.
+- Do not use the combined “enable live execution” action merely to make the gate green.
 
 Exit criteria:
 - `BLOCKERS = 0`
