@@ -18,7 +18,13 @@ Current staging API:
 `https://threshold-api-production.up.railway.app`
 
 ## Milestone 1 — Real frontend deployment
-**Status: IN PROGRESS**
+**Status: PASS**
+
+Evidence:
+- The full staging control-plane UI is served same-origin from the Railway API root at `https://threshold-api-production.up.railway.app/`.
+- The root returns HTTP 200 and renders the Threshold Control Plane login.
+- Seeded demo login succeeds and authenticated screens load through the live API.
+- Same-origin staging avoids relying on the protected Vercel preview for validation.
 
 Work:
 - Use the complete M8 SaaS dashboard, not the older lightweight portfolio dashboard.
@@ -34,7 +40,20 @@ Exit criteria:
 - Authentication UI is functional.
 
 ## Milestone 2 — Core SaaS smoke test
-**Status: TODO**
+**Status: IN PROGRESS**
+
+Evidence so far:
+- Seeded demo login: PASS.
+- `/api/v1/auth/me` and `/api/v1/organizations`: PASS.
+- Authenticated reads for metrics, executions, approvals, recovery, audit, actions, policies, workflows, integrations, webhook endpoints, members, invitations, onboarding and beta-readiness: HTTP 200.
+- Billing initially exposed a real schema defect: `billing_accounts.created_at` had no database default.
+- Added migration `e8b0c234f6a8`; Alembic applied it successfully and Billing regression test now PASS.
+- Billing UI now renders demo/trialing state and usage without a 500.
+
+Still required for exit:
+- Fresh registration path.
+- New workspace creation/select path.
+- Explicit cross-workspace isolation test.
 
 Work:
 - Register a test user.
@@ -49,7 +68,19 @@ Exit criteria:
 - No cross-workspace data leakage observed.
 
 ## Milestone 3 — Controlled workflow end-to-end
-**Status: TODO**
+**Status: IN PROGRESS**
+
+Evidence so far:
+- Low-risk refund demo execution `5907e7b5-bfce-4796-992b-17baa6dc5791`: completed; all 8 workflow steps succeeded; mock action succeeded and verification passed.
+- High-risk execution `83fdb801-2eb8-402a-bce5-c24a84e9201e`: correctly stopped at `approval_gate` with status `awaiting_approval`.
+- Approval `86779dda-aa86-43b3-b485-0896f7b02ce9` was created because $89.99 exceeded the $75 auto-approval limit; no action executed before human authority.
+- Celery Beat/Worker path is live: periodic `dispatch_outbox`, `recover_stale_actions`, `retry_due_actions` and `recover_stale_events` tasks are repeatedly received and completed successfully.
+- Recovery/Beta UI reports zero failed/dead-letter inbound events and zero failed/dead-letter outbox messages.
+
+Still required for exit:
+- One real queued/persisted inbound event through `process_persisted_event` end-to-end.
+- Explicit duplicate/idempotency replay proof.
+- Explicit failure/retry/reconciliation proof on staging.
 
 Work:
 - Run mock/controlled scenarios through API -> DB -> outbox -> Celery -> result.
