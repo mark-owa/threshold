@@ -165,6 +165,7 @@ Exit criteria:
 **Status: IN PROGRESS**
 
 Passed staging evidence:
+- Simulated provider transient failure/retry: PASS. Execution `ee4d04d5-b046-40fc-a3fc-2b8789565ac7` failed at the mock execute step with `simulated_external_timeout`; the periodic `threshold.retry_due_actions` worker then processed exactly 1 due retry and the same execution transitioned to `COMPLETED`. Live provider execution remained disabled throughout.
 - Worker replacement/restart: PASS. A replacement Celery worker connected to Redis and resumed successful `threshold.dispatch_outbox` consumption.
 - A real Redis redeploy exposed a resilience defect: stock Celery 5.6.3 could keep the process alive while no longer consuming after broker loss.
 - Added explicit Celery retry/keepalive configuration plus Redis-aware Worker and Beat supervisors.
