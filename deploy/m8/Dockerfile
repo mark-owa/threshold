@@ -13,13 +13,17 @@ RUN apt-get update \
     && useradd --system --gid threshold --home /app threshold
 
 COPY runtime.b64.part-* /tmp/runtime-parts/
+COPY apply_shopify_hardening.py /tmp/apply_shopify_hardening.py
 
 RUN cat /tmp/runtime-parts/runtime.b64.part-* \
     | base64 -d > /tmp/runtime.tar.gz \
     && echo "7ecf6c3b6bb1cf493c9145a4de8f47d3a4373d49ee1815a92bf07aca57846338  /tmp/runtime.tar.gz" | sha256sum -c - \
     && tar -xzf /tmp/runtime.tar.gz -C /app \
     && rm -rf /tmp/runtime-parts /tmp/runtime.tar.gz \
-    && pip install -r /app/requirements.txt
+    && pip install -r /app/requirements.txt \
+    && python /tmp/apply_shopify_hardening.py \
+    && python -m compileall -q /app/app \
+    && rm -f /tmp/apply_shopify_hardening.py
 
 COPY frontend_index.html /app/frontend_index.html
 COPY staging_entry.py /app/staging_entry.py
