@@ -139,3 +139,27 @@ jobs:
             threshold-m8-ci sh -lc \
             "python -m pip install pytest==9.1.1 pytest-cov==7.1.0 Faker==40.36.0 >/dev/null && python -m pytest -q /tmp/m8_tests"
 
+      - name: Inspect M8 event recovery state contract
+        run: |
+          docker run --rm threshold-m8-ci python -c '
+          from pathlib import Path
+          targets = {
+              "/app/app/models/enums.py": ("EventProcessingStatus",),
+              "/app/app/models/event.py": ("class IncomingEvent", "attempt", "processing_status", "error", "dead"),
+              "/app/app/workflows/engine.py": ("retry_failed_execution", "processing_status", "incoming_event"),
+              "/app/app/workers/tasks.py": ("recover_stale_events", "retry_due_actions", "processing_status", "IncomingEvent"),
+          }
+          for raw, terms in targets.items():
+              p = Path(raw)
+              print(f"===== {p} =====")
+              lines = p.read_text().splitlines()
+              hits = [i for i,line in enumerate(lines) if any(t.lower() in line.lower() for t in terms)]
+              keep = sorted({j for i in hits for j in range(max(0,i-12), min(len(lines),i+22))})
+              last=-2
+              for j in keep:
+                  if j != last+1:
+                      print("...")
+                  print(f"{j+1:04d}: {lines[j]}")
+                  last=j
+          '
+
