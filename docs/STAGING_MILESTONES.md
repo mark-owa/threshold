@@ -123,6 +123,7 @@ Code-hardening evidence (2026-09-18):
 - Targeted Shopify tests passed 4/4 and the patched modules compiled.
 - The fail-closed build overlay was deployed successfully on Railway.
 - OAuth vault read path is deployed on Railway; `/health` and `/health/ready` remained green after rollout, with database and Redis ready and outbox pending = 0.
+- Expiring offline token support is deployed on Railway (commit `1afee144acd49269498dc6d64010d27a8dde18ac`): OAuth code exchange requests `expiring=1`; access+rotating refresh credentials are stored as one opaque vault bundle; the Shopify client refreshes five minutes before expiry, retries once after a 401, serializes refresh through the integration row lock, and marks reauthorization required if Shopify rejects the refresh token. M8 CI, migrations, backend, and frontend were green before merge; post-deploy health/readiness are green.
 
 Still required before PASS:
 - User-owned Shopify development app/store credentials.
