@@ -122,13 +122,14 @@ Code-hardening evidence (2026-09-18):
 - `X-Shopify-Shop-Domain` is normalized and bound to the configured shop before accepting a webhook.
 - Targeted Shopify tests passed 4/4 and the patched modules compiled.
 - The fail-closed build overlay was deployed successfully on Railway.
+- OAuth vault read path is deployed on Railway; `/health` and `/health/ready` remained green after rollout, with database and Redis ready and outbox pending = 0.
 
 Still required before PASS:
 - User-owned Shopify development app/store credentials.
 - Live OAuth install against a development store.
 - Real signed webhook delivery.
 - Canonical Admin GraphQL order sync.
-- Runtime credential/vault read support for OAuth-written merchant tokens.
+- Runtime credential/vault read support for OAuth-written merchant tokens. **DONE:** merged commit `1c43af6f87e89e514f4ef7facf187849375f6bcd`; env secrets retain priority, OAuth-managed refs fall back to the authenticated vault read endpoint; M8 CI passed and API/Worker/Beat deployed successfully.
 - Expiring offline-token refresh lifecycle where required.
 
 Exit criteria:
