@@ -9,3 +9,4 @@
 !apply_shopify_hardening.py
 !apply_stripe_hardening.py
 !apply_celery_recovery_hardening.py
+!worker_supervisor.py
