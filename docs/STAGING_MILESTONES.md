@@ -43,6 +43,18 @@ Exit criteria:
 ## Milestone 2 — Core SaaS smoke test
 **Status: IN PROGRESS**
 
+Validated evidence (2026-09-18):
+- Seeded owner authentication succeeds in the deployed UI.
+- A new workspace `Threshold M2 Smoke 20260918` was created successfully.
+- New workspace screens loaded in empty/default state: Overview, Team, Policies, Integrations, Billing & usage, Beta readiness, Executions, Approvals, Actions, Recovery, Audit.
+- Workspace selector showed the new workspace separately from `Acme Retail Co.`.
+- Switching back to `Acme Retail Co.` preserved its seeded executions/workflows/approval data, providing basic workspace-separation evidence.
+- No live execution, integrations, invitations, billing purchases, policy changes, approvals, or deletions were performed.
+
+Remaining before PASS:
+- Fresh-user registration path still requires direct staging verification.
+- Role-specific RBAC behavior (Admin/Reviewer/Viewer) still requires dedicated verification.
+
 Evidence so far:
 - Seeded demo login: PASS.
 - `/api/v1/auth/me` and `/api/v1/organizations`: PASS.
