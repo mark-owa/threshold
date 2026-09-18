@@ -137,4 +137,4 @@ jobs:
             -e WEBHOOK_SIGNING_SECRET \
             -v "${{ github.workspace }}/m8_tests:/tmp/m8_tests:ro" \
             threshold-m8-ci sh -lc \
-            "pip install pytest==9.1.1 pytest-cov==7.1.0 Faker==40.36.0 >/dev/null && pytest -q /tmp/m8_tests"
+            "python -m pip install pytest==9.1.1 pytest-cov==7.1.0 Faker==40.36.0 >/dev/null && python -m pytest -q /tmp/m8_tests"
