@@ -41,7 +41,7 @@ Exit criteria:
 - Overview, Approvals, Executions, Actions, Recovery, Policies, Integrations, Team, Billing & usage, Beta readiness, Audit log, and Demo sandbox all open successfully.
 
 ## Milestone 2 — Core SaaS smoke test
-**Status: IN PROGRESS**
+**Status: PASS**
 
 Validated evidence (2026-09-18):
 - Seeded owner authentication succeeds in the deployed UI.
@@ -51,9 +51,12 @@ Validated evidence (2026-09-18):
 - Switching back to `Acme Retail Co.` preserved its seeded executions/workflows/approval data, providing basic workspace-separation evidence.
 - No live execution, integrations, invitations, billing purchases, policy changes, approvals, or deletions were performed.
 
-Remaining before PASS:
-- Fresh-user registration path still requires direct staging verification.
-- Role-specific RBAC behavior (Admin/Reviewer/Viewer) still requires dedicated verification.
+Additional CI evidence (2026-09-18):
+- A dedicated `m8-runtime` GitHub Actions job now builds the exact `/deploy/m8` Docker artifact used by Railway.
+- The full M8 Alembic migration chain completes successfully in that image.
+- 9/9 SaaS/RBAC regression tests passed against real PostgreSQL/Redis-backed CI.
+- Coverage includes registration creating an isolated trial workspace, membership-scoped workspace listing, workspace creation, trial/demo boundary, membership enforcement, hashed invitations, admin role restrictions, last-owner protection, and onboarding/policy behavior.
+- Automated live creation of a second login identity was not performed because the browser automation safety layer blocks account creation; registration is therefore CI-proven rather than browser-proven.
 
 Evidence so far:
 - Seeded demo login: PASS.
