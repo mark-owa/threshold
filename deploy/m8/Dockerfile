@@ -23,6 +23,7 @@ RUN cat /tmp/runtime-parts/runtime.b64.part-* \
 
 COPY frontend_index.html /app/frontend_index.html
 COPY staging_entry.py /app/staging_entry.py
+COPY e8b0c234f6a8_billing_timestamp_defaults.py /app/alembic/versions/e8b0c234f6a8_billing_timestamp_defaults.py
 COPY scripts /app/scripts
 
 RUN chown -R threshold:threshold /app
