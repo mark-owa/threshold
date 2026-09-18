@@ -8,3 +8,4 @@
 !e8b0c234f6a8_billing_timestamp_defaults.py
 !apply_shopify_hardening.py
 !apply_stripe_hardening.py
+!apply_celery_recovery_hardening.py
