@@ -14,6 +14,7 @@ RUN apt-get update \
 
 COPY runtime.b64.part-* /tmp/runtime-parts/
 COPY apply_shopify_hardening.py /tmp/apply_shopify_hardening.py
+COPY apply_shopify_expiring_tokens.py /tmp/apply_shopify_expiring_tokens.py
 COPY apply_vault_read_support.py /tmp/apply_vault_read_support.py
 COPY apply_stripe_hardening.py /tmp/apply_stripe_hardening.py
 COPY apply_celery_recovery_hardening.py /tmp/apply_celery_recovery_hardening.py
@@ -27,11 +28,12 @@ RUN cat /tmp/runtime-parts/runtime.b64.part-* \
     && pip install -r /app/requirements.txt \
     && python /tmp/apply_shopify_hardening.py \
     && python /tmp/apply_vault_read_support.py \
+    && python /tmp/apply_shopify_expiring_tokens.py \
     && python /tmp/apply_stripe_hardening.py \
     && python /tmp/apply_celery_recovery_hardening.py \
     && python /tmp/apply_readiness_head_patch.py \
     && python -m compileall -q /app/app \
-    && rm -f /tmp/apply_shopify_hardening.py /tmp/apply_vault_read_support.py /tmp/apply_stripe_hardening.py /tmp/apply_celery_recovery_hardening.py /tmp/apply_readiness_head_patch.py
+    && rm -f /tmp/apply_shopify_hardening.py /tmp/apply_vault_read_support.py /tmp/apply_shopify_expiring_tokens.py /tmp/apply_stripe_hardening.py /tmp/apply_celery_recovery_hardening.py /tmp/apply_readiness_head_patch.py
 
 COPY frontend_index.html /app/frontend_index.html
 COPY staging_entry.py /app/staging_entry.py
