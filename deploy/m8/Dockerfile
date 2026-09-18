@@ -34,4 +34,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -f http://127.0.0.1:8000/health || exit 1
 
-CMD ["sh", "-c", "python -m scripts.seed_demo_org && python -m scripts.seed_prompts && exec uvicorn staging_entry:app --host 0.0.0.0 --port 8000"]
+CMD ["uvicorn", "staging_entry:app", "--host", "0.0.0.0", "--port", "8000"]
