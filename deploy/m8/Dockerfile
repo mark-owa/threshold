@@ -32,6 +32,7 @@ RUN cat /tmp/runtime-parts/runtime.b64.part-* \
 COPY frontend_index.html /app/frontend_index.html
 COPY staging_entry.py /app/staging_entry.py
 COPY worker_supervisor.py /app/worker_supervisor.py
+COPY beat_supervisor.py /app/beat_supervisor.py
 COPY e8b0c234f6a8_billing_timestamp_defaults.py /app/alembic/versions/e8b0c234f6a8_billing_timestamp_defaults.py
 COPY scripts /app/scripts
 
