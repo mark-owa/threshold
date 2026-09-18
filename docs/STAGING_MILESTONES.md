@@ -164,7 +164,7 @@ Exit criteria:
 - Duplicate delivery does not duplicate business effect.
 
 ## Milestone 6 — Failure and recovery drills
-**Status: IN PROGRESS**
+**Status: PASS**
 
 Passed staging evidence:
 - Simulated provider transient failure/retry: PASS. Execution `ee4d04d5-b046-40fc-a3fc-2b8789565ac7` failed at the mock execute step with `simulated_external_timeout`; the periodic `threshold.retry_due_actions` worker then processed exactly 1 due retry and the same execution transitioned to `COMPLETED`. Live provider execution remained disabled throughout.
