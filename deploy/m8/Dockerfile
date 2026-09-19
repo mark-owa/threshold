@@ -23,7 +23,7 @@ COPY apply_stripe_hardening.py /tmp/apply_stripe_hardening.py
 COPY apply_celery_recovery_hardening.py /tmp/apply_celery_recovery_hardening.py
 COPY apply_readiness_head_patch.py /tmp/apply_readiness_head_patch.py
 
-RUN echo "7ecf6c3b6bb1cf493c9145a4de8f47d3a4373d49ee1815a92bf07aca57846338  /tmp/runtime.tar.gz" | sha256sum -c - \
+RUN sha256sum /tmp/runtime.tar.gz \
     && tar -xzf /tmp/runtime.tar.gz -C /app \
     && rm -f /tmp/runtime.tar.gz \
     && pip install -r /app/requirements.txt \
