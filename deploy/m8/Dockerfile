@@ -12,7 +12,10 @@ RUN apt-get update \
     && groupadd --system threshold \
     && useradd --system --gid threshold --home /app threshold
 
-COPY runtime.b64.part-* /tmp/runtime-parts/
+# M8 keeps a frozen backend runtime snapshot plus narrowly scoped hardening overlays.
+# Use the committed runtime archive directly; the previous Base64 chunk reconstruction
+# added build noise without changing the payload.
+COPY threshold_m8_backend_runtime.tar.gz /tmp/runtime.tar.gz
 COPY apply_shopify_hardening.py /tmp/apply_shopify_hardening.py
 COPY apply_shopify_expiring_tokens.py /tmp/apply_shopify_expiring_tokens.py
 COPY apply_vault_read_support.py /tmp/apply_vault_read_support.py
@@ -20,11 +23,9 @@ COPY apply_stripe_hardening.py /tmp/apply_stripe_hardening.py
 COPY apply_celery_recovery_hardening.py /tmp/apply_celery_recovery_hardening.py
 COPY apply_readiness_head_patch.py /tmp/apply_readiness_head_patch.py
 
-RUN cat /tmp/runtime-parts/runtime.b64.part-* \
-    | base64 -d > /tmp/runtime.tar.gz \
-    && echo "7ecf6c3b6bb1cf493c9145a4de8f47d3a4373d49ee1815a92bf07aca57846338  /tmp/runtime.tar.gz" | sha256sum -c - \
+RUN echo "7ecf6c3b6bb1cf493c9145a4de8f47d3a4373d49ee1815a92bf07aca57846338  /tmp/runtime.tar.gz" | sha256sum -c - \
     && tar -xzf /tmp/runtime.tar.gz -C /app \
-    && rm -rf /tmp/runtime-parts /tmp/runtime.tar.gz \
+    && rm -f /tmp/runtime.tar.gz \
     && pip install -r /app/requirements.txt \
     && python /tmp/apply_shopify_hardening.py \
     && python /tmp/apply_vault_read_support.py \
