@@ -50,6 +50,25 @@ jobs:
         working-directory: tooling/capture
         run: node capture.mjs
 
+      - name: Publish verified demo media to the repository
+        run: |
+          mkdir -p docs/assets/demo
+          cp tooling/capture/output/publish/dashboard-overview.png docs/assets/demo/
+          cp tooling/capture/output/publish/approval-required.png docs/assets/demo/
+          cp tooling/capture/output/publish/execution-inspector.png docs/assets/demo/
+          cp tooling/capture/output/publish/retry-recovery.png docs/assets/demo/
+          cp tooling/capture/output/publish/approval-demo.gif docs/assets/demo/
+          cp tooling/capture/output/publish/capture-evidence.json docs/assets/demo/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/assets/demo
+          if git diff --cached --quiet; then
+            echo "Demo media unchanged"
+          else
+            git commit -m "Publish verified Threshold demo media"
+            git push
+          fi
+
       - name: Upload verified demo media
         uses: actions/upload-artifact@v4
         with:
