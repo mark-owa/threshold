@@ -8,7 +8,7 @@ No real payments or emails are sent in the demo.
 
 ![Threshold dashboard](docs/assets/demo/dashboard-overview.png)
 
-**Repository history:** Threshold was developed before this GitHub repository was created. The public history starts with the later repository import rather than the original local development timeline.
+**Portfolio note:** Threshold was already being developed locally before this portfolio repository was published. The history here begins with the import and later deployment-hardening work, not the project's first implementation.
 
 ## What this project demonstrates
 
