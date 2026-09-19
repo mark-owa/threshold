@@ -5,6 +5,10 @@ React dashboard. Its reference workflow takes a refund request, extracts an orde
 and amount, checks deterministic policy, and either records a mock refund or pauses
 for human review. No real money moves and no email is sent.
 
+**Repository history:** Threshold was developed before this GitHub repository was
+created. It was published here later, so the public commit history begins with the
+repository import rather than the project's original development timeline.
+
 ## The business problem
 
 A refund request involves more than extracting a number from a message. An operator
@@ -12,8 +16,8 @@ must check the order, apply policy, decide when review is required, and understa
 what happened if processing fails. Threshold makes those decisions and outcomes
 inspectable in one local demonstration.
 
-The reference case is a fictional retail operation. It demonstrates an approach to
-controlled automation; it is not a customer deployment or evidence of measured savings.
+The reference case is a fictional retail operation used to demonstrate controlled
+automation. It does not connect to a live payment system.
 
 ![Architecture overview: dashboard, API and workflow engine, PostgreSQL, and optional queued workers](docs/assets/architecture-overview.svg)
 
@@ -106,10 +110,10 @@ make unit-test
 ```
 
 See [TESTING](docs/TESTING.md) for test isolation and verification boundaries.
-See [VERIFICATION](docs/VERIFICATION.md) for the distinction between the bundled
-review's reported results and checks repeated during this documentation pass.
+See [VERIFICATION](docs/VERIFICATION.md) for the checks that were run and what each
+one covers.
 The backend image includes development tools because this Compose setup is a local
-portfolio/demo environment. `make down` stops containers; PostgreSQL data remains
+demo environment. `make down` stops containers; PostgreSQL data remains
 in its named volume.
 
 ### Windows / PowerShell without Make
@@ -146,7 +150,7 @@ and `docker compose exec backend python -m scripts.evaluate_ai`.
 
 ## Scope and limitations
 
-This is a portfolio prototype, not a production payment or automation service.
+This is a local prototype, not a production payment or automation service.
 
 - Actions and notifications are mocks. Refund keys deduplicate an order/amount pair;
   this is not a payment ledger and does not track cumulative partial refunds.
