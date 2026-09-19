@@ -1,6 +1,6 @@
 *
 !Dockerfile
-!runtime.b64.part-*
+!threshold_m8_backend_runtime.tar.gz
 !frontend_index.html
 !staging_entry.py
 !scripts/
