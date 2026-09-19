@@ -66,7 +66,7 @@ jobs:
             echo "Demo media unchanged"
           else
             git commit -m "Publish verified Threshold demo media"
-            git push
+            git push origin HEAD:${GITHUB_REF_NAME}
           fi
 
       - name: Upload verified demo media
