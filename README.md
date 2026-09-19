@@ -1,5 +1,7 @@
 # Threshold
 
+**Stack:** FastAPI · React · PostgreSQL · Redis/Celery · Playwright
+
 Threshold is a full-stack operations prototype for **controlled business automation**. The reference workflow accepts refund requests, extracts structured data, applies deterministic policy, pauses risky actions for human approval, and records execution and recovery evidence.
 
 No real payments or emails are sent in the demo.
