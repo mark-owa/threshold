@@ -1,0 +1,32 @@
+{
+  "recorded_at": "2026-09-19T01:15:08.992Z",
+  "source_commit": "6f0f36a5db6d4f7b8c83f0bf67d1e7e7a967db87",
+  "run_url": "https://github.com/mark-owa/threshold/actions/runs/35411976554",
+  "environment": "Docker Compose: PostgreSQL, Redis, FastAPI, nginx and production React build",
+  "provider": "mock",
+  "recovery": "manual; worker and Beat not running",
+  "checks": {
+    "automatic_refund": {
+      "execution_id": "9769f047-a27e-4523-9c4f-22236581f9c0",
+      "status": "completed"
+    },
+    "approval_pause": {
+      "execution_id": "aa89f99b-df5b-483b-8eb0-c33bf7ddb338",
+      "status": "awaiting_approval"
+    },
+    "approval_completed": {
+      "approval_id": "68fbf7bb-d959-4e41-a0ac-4c0f6e9a5649",
+      "execution_id": "aa89f99b-df5b-483b-8eb0-c33bf7ddb338",
+      "status": "completed",
+      "reviewer_id": "4a01ee24-cbeb-44b7-b4f5-d45732531dd6"
+    },
+    "retry_same_action": {
+      "execution_id": "86b6e74b-888f-43e7-b981-2da9a21db766",
+      "action_id": "0ec51cbb-5854-4695-8a3b-9d99d10efeb0",
+      "failed_event_id": "0f08e19d-c480-4340-8df2-6354367c1215",
+      "recovered_event_id": "e5bd7135-5135-48b4-99d2-32bcef1118ef",
+      "status": "completed"
+    }
+  },
+  "duration_seconds": 179.997
+}
