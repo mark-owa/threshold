@@ -29,6 +29,7 @@ class IntegrationConfig(Base, UUIDPKMixin, TimestampMixin):
         enum_column(IntegrationProvider), nullable=False
     )
     config: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    credential_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     consecutive_failures: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     failure_threshold: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
@@ -67,8 +68,33 @@ class ActionExecution(Base, UUIDPKMixin, TimestampMixin):
     attempt_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     max_attempts: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
     next_retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    locked_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     request_payload: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
     response_payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class ActionAttempt(Base, UUIDPKMixin, TimestampMixin):
+    """One provider interaction for an action. Authentication material is never persisted."""
+
+    __tablename__ = "action_attempts"
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        GUID, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    action_execution_id: Mapped[uuid.UUID] = mapped_column(
+        GUID, ForeignKey("action_executions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    operation: Mapped[str] = mapped_column(String(50), nullable=False, default="execute")
+    provider: Mapped[str] = mapped_column(String(100), nullable=False)
+    provider_operation_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    request_payload: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    response_payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    outcome: Mapped[str] = mapped_column(String(50), nullable=False)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

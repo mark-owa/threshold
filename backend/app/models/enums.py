@@ -24,9 +24,12 @@ class EventSource(StrEnum):
 
 class EventProcessingStatus(StrEnum):
     RECEIVED = "received"
+    PROCESSING = "processing"
     NORMALIZED = "normalized"
     ROUTED = "routed"
+    COMPLETED = "completed"
     FAILED = "failed"
+    DEAD_LETTER = "dead_letter"
     DUPLICATE = "duplicate"
 
 
@@ -43,6 +46,7 @@ class WorkflowStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
     AWAITING_APPROVAL = "awaiting_approval"
+    WAITING_EXTERNAL = "waiting_external"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
@@ -92,6 +96,7 @@ class ActionStatus(StrEnum):
     RETRYING = "retrying"
     DEAD_LETTER = "dead_letter"
     ROLLED_BACK = "rolled_back"
+    UNKNOWN = "unknown"
 
 
 class IntegrationProvider(StrEnum):
@@ -100,6 +105,8 @@ class IntegrationProvider(StrEnum):
     MOCK_SLACK = "mock_slack"
     MOCK_PAYMENTS = "mock_payments"
     GENERIC_REST = "generic_rest"
+    SHOPIFY = "shopify"
+    STRIPE = "stripe"
 
 
 class AIProvider(StrEnum):
@@ -111,3 +118,11 @@ class AIProvider(StrEnum):
 class NotificationChannel(StrEnum):
     EMAIL = "email"
     SLACK = "slack"
+
+
+class OutboxStatus(StrEnum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    SENT = "sent"
+    FAILED = "failed"
+    DEAD_LETTER = "dead_letter"

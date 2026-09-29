@@ -29,7 +29,19 @@ celery_app.autodiscover_tasks(["app.workers"])
 
 
 celery_app.conf.beat_schedule = {
-    "retry-due-actions-every-minute": {
+    "dispatch-outbox-every-five-seconds": {
+        "task": "threshold.dispatch_outbox",
+        "schedule": 5.0,
+    },
+    "recover-stale-actions-every-minute": {
+        "task": "threshold.recover_stale_actions",
+        "schedule": 60.0,
+    },
+    "recover-stale-events-every-minute": {
+        "task": "threshold.recover_stale_events",
+        "schedule": 60.0,
+    },
+    "retry-demo-actions-every-minute": {
         "task": "threshold.retry_due_actions",
         "schedule": 60.0,
     },

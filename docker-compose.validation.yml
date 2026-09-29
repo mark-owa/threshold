@@ -1,0 +1,22 @@
+services:
+  provider-simulator:
+    build: ./backend
+    restart: "no"
+    environment:
+      PROVIDER_SIMULATOR_TOKEN: local-simulator-token
+      PROVIDER_SIMULATOR_UNKNOWN_DELAY_SECONDS: "2"
+    command: ["uvicorn", "scripts.provider_simulator:app", "--host", "0.0.0.0", "--port", "8090"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+
+  backend:
+    environment:
+      APP_ENV: development
+      INTEGRATION_ALLOWED_HOSTS: provider-simulator
+      THRESHOLD_INTEGRATION_SECRET__LOCAL_SIMULATOR: local-simulator-token
+    depends_on:
+      provider-simulator:
+        condition: service_healthy

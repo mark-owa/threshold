@@ -6,10 +6,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.auth import get_current_user
+from app.api.tenancy import require_org_roles
 from app.core.config import get_settings
 from app.db.session import get_db
-from app.models import ApprovalRequest, OrganizationMember, User
-from app.models.enums import ApprovalStatus
+from app.models import ApprovalRequest, User
+from app.models.enums import ApprovalStatus, MemberRole
 from app.workflows.engine import WorkflowEngine
 
 router = APIRouter(prefix=f"{get_settings().API_V1_PREFIX}/approvals", tags=["approvals"])
@@ -21,17 +22,6 @@ class DecisionRequest(BaseModel):
     modified_parameters: dict | None = None
 
 
-def _membership(db: Session, org_id: UUID, user_id: UUID) -> OrganizationMember:
-    member = db.scalar(
-        select(OrganizationMember).where(
-            OrganizationMember.organization_id == org_id,
-            OrganizationMember.user_id == user_id,
-        )
-    )
-    if member is None or member.role.value not in {"owner", "admin", "reviewer"}:
-        raise HTTPException(status_code=403, detail="Reviewer permission required")
-    return member
-
 
 @router.post("/{approval_id}/decision")
 def decide(
@@ -41,7 +31,13 @@ def decide(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    _membership(db, org_id, user.id)
+    require_org_roles(
+        org_id,
+        user.id,
+        db,
+        {MemberRole.OWNER, MemberRole.ADMIN, MemberRole.REVIEWER},
+        detail="Reviewer permission required",
+    )
     approval = db.scalar(
         select(ApprovalRequest)
         .where(

@@ -26,6 +26,7 @@ class Customer(Base, UUIDPKMixin, TimestampMixin):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    external_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     tier: Mapped[str] = mapped_column(String(50), default="standard", nullable=False)
 
     orders: Mapped[list["Order"]] = relationship(back_populates="customer")
@@ -44,7 +45,12 @@ class Order(Base, UUIDPKMixin, TimestampMixin):
         GUID, ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True
     )
     order_number: Mapped[str] = mapped_column(String(50), nullable=False)
+    external_order_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    payment_reference: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    payment_gateway: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    currency: Mapped[str] = mapped_column(String(3), default="USD", nullable=False)
     amount_usd: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    refunded_amount_usd: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0.00"), nullable=False)
     status: Mapped[str] = mapped_column(String(50), default="completed", nullable=False)
     ordered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 

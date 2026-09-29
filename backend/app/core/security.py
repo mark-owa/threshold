@@ -6,6 +6,7 @@ to track), and `PyJWT` for tokens. Login and current-user routes use these primi
 """
 
 from datetime import UTC, datetime, timedelta
+import uuid
 
 import bcrypt
 import jwt
@@ -33,10 +34,27 @@ def create_access_token(subject: str, expires_minutes: int | None = None) -> str
         expires_minutes if expires_minutes is not None else settings.ACCESS_TOKEN_EXPIRE_MINUTES
     )
     expire = datetime.now(UTC) + timedelta(minutes=minutes)
-    payload = {"sub": subject, "exp": expire, "type": "access"}
+    now = datetime.now(UTC)
+    payload = {
+        "sub": subject,
+        "exp": expire,
+        "iat": now,
+        "nbf": now,
+        "jti": str(uuid.uuid4()),
+        "iss": settings.JWT_ISSUER,
+        "aud": settings.JWT_AUDIENCE,
+        "type": "access",
+    }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
 
 
 def decode_token(token: str) -> dict:
     settings = get_settings()
-    return jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+    return jwt.decode(
+        token,
+        settings.SECRET_KEY,
+        algorithms=[ALGORITHM],
+        issuer=settings.JWT_ISSUER,
+        audience=settings.JWT_AUDIENCE,
+        options={"require": ["exp", "iat", "nbf", "jti", "iss", "aud", "sub", "type"]},
+    )

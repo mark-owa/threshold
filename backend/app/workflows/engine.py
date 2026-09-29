@@ -13,6 +13,7 @@ from app.ai.prompts import resolve_prompt
 from app.ai.providers import get_ai_provider
 from app.core.config import get_settings
 from app.models import (
+    ActionAttempt,
     ActionExecution,
     AIUsageLog,
     ApprovalRequest,
@@ -39,6 +40,9 @@ from app.models.enums import (
     StepType,
     WorkflowStatus,
 )
+from app.integrations.providers import get_refund_provider
+from app.services.outbox import enqueue_outbox
+from app.services.commercial import assert_entitled, increment_usage
 from app.workflows.primitives import (
     classify_text,
     extract_refund,
@@ -80,10 +84,11 @@ class WorkflowEngine:
         raw_payload: dict,
         request_id: str | None = None,
     ) -> WorkflowExecution:
+        """Synchronous compatibility path used by the demo and tests.
+
+        Production webhooks use the durable ingress/outbox path instead.
+        """
         source = EventSource(source)
-        normalized = self._normalize(raw_payload)
-        # Serialize this small demo's ingestion per tenant so duplicate deliveries
-        # resolve to the committed execution, including simultaneous submissions.
         org = self.db.scalar(
             select(Organization).where(Organization.id == organization_id).with_for_update()
         )
@@ -103,31 +108,110 @@ class WorkflowEngine:
             )
             if existing_execution:
                 return existing_execution
+            event = existing_event
+        else:
+            event = IncomingEvent(
+                organization_id=organization_id,
+                source=source,
+                idempotency_key=idempotency_key,
+                request_id=request_id,
+                raw_payload=raw_payload,
+                signature_verified=False,
+            )
+            self.db.add(event)
+            self.db.flush()
+            self._audit(
+                organization_id, None, "event_received", "system", {"event_id": str(event.id)}
+            )
+        return self._run_event_record(event)
 
-        event = IncomingEvent(
-            organization_id=organization_id,
-            source=source,
-            idempotency_key=idempotency_key,
-            request_id=request_id,
-            raw_payload=raw_payload,
-            external_id=normalized.get("external_id"),
-            signature_verified=False,
+    def process_persisted_event(self, event_id: uuid.UUID) -> WorkflowExecution:
+        """Idempotently process an already committed inbound event.
+
+        The event row is the durable source of truth; worker redelivery is safe.
+        """
+        event = self.db.scalar(
+            select(IncomingEvent).where(IncomingEvent.id == event_id).with_for_update()
         )
-        self.db.add(event)
-        self.db.flush()
-        self._audit(organization_id, None, "event_received", "system", {"event_id": str(event.id)})
+        if event is None:
+            raise ValueError("Incoming event not found")
+        existing = self.db.scalar(
+            select(WorkflowExecution).where(WorkflowExecution.incoming_event_id == event.id)
+        )
+        if existing is not None:
+            if existing.status == WorkflowStatus.COMPLETED:
+                event.processing_status = EventProcessingStatus.COMPLETED
+                event.completed_at = existing.completed_at or datetime.now(UTC)
+                event.last_error = None
+                self.db.commit()
+            return existing
 
+        lease_cutoff = datetime.now(UTC) - timedelta(
+            seconds=get_settings().EVENT_PROCESSING_LEASE_SECONDS
+        )
+        if (
+            event.processing_status == EventProcessingStatus.PROCESSING
+            and event.processing_started_at is not None
+            and event.processing_started_at > lease_cutoff
+        ):
+            raise ValueError("event_processing_lease_active")
+
+        event.processing_status = EventProcessingStatus.PROCESSING
+        event.processing_attempts += 1
+        event.processing_started_at = datetime.now(UTC)
+        event.next_retry_at = None
+        event.last_error = None
+        self.db.commit()
+
+        try:
+            event = self.db.get(IncomingEvent, event_id)
+            if event is None:
+                raise ValueError("Incoming event disappeared during processing")
+            return self._run_event_record(event)
+        except Exception as exc:
+            self.db.rollback()
+            event = self.db.scalar(
+                select(IncomingEvent).where(IncomingEvent.id == event_id).with_for_update()
+            )
+            if event is not None:
+                event.last_error = str(exc)
+                event.processing_started_at = None
+                if event.processing_attempts >= event.max_processing_attempts:
+                    event.processing_status = EventProcessingStatus.DEAD_LETTER
+                    event.next_retry_at = None
+                else:
+                    event.processing_status = EventProcessingStatus.FAILED
+                    event.next_retry_at = datetime.now(UTC) + timedelta(
+                        seconds=self.retry_delay_seconds(event.processing_attempts, base=5, cap=300)
+                    )
+                    enqueue_outbox(
+                        self.db,
+                        organization_id=event.organization_id,
+                        topic="process_incoming_event",
+                        aggregate_type="incoming_event",
+                        aggregate_id=event.id,
+                        payload={
+                            "event_id": str(event.id),
+                            "organization_id": str(event.organization_id),
+                        },
+                        available_at=event.next_retry_at,
+                    )
+                self.db.commit()
+            raise
+
+    def _run_event_record(self, event: IncomingEvent) -> WorkflowExecution:
+        normalized = self._normalize(event.raw_payload)
+        event.external_id = event.external_id or normalized.get("external_id")
         event.normalized_payload = normalized
         event.processing_status = EventProcessingStatus.NORMALIZED
-        self._audit(organization_id, None, "event_normalized", "system", normalized)
+        self._audit(event.organization_id, None, "event_normalized", "system", normalized)
 
         category = self._classify(normalized.get("text", ""))
         event.processing_status = EventProcessingStatus.ROUTED
-
         workflow = self.db.scalar(
             select(WorkflowDefinition)
             .where(
-                WorkflowDefinition.organization_id == organization_id,
+                WorkflowDefinition.organization_id == event.organization_id,
                 WorkflowDefinition.trigger_category == category,
                 WorkflowDefinition.is_active.is_(True),
             )
@@ -145,10 +229,17 @@ class WorkflowEngine:
             )
         if workflow is None:
             event.processing_status = EventProcessingStatus.FAILED
-            raise ValueError(f"No active workflow for category={category.value}")
+            event.last_error = f"No active workflow for category={category.value}"
+            self.db.commit()
+            raise ValueError(event.last_error)
+
+        organization = self.db.get(Organization, event.organization_id)
+        if organization is None:
+            raise ValueError("Organization not found")
+        assert_entitled(self.db, organization, "workflow_executions")
 
         execution = WorkflowExecution(
-            organization_id=organization_id,
+            organization_id=event.organization_id,
             workflow_definition_id=workflow.id,
             incoming_event_id=event.id,
             status=WorkflowStatus.RUNNING,
@@ -157,18 +248,34 @@ class WorkflowEngine:
         )
         self.db.add(execution)
         self.db.flush()
+        increment_usage(self.db, event.organization_id, "workflow_executions")
         self._audit(
-            organization_id,
+            event.organization_id,
             execution.id,
             "workflow_selected",
             "system",
             {"workflow": workflow.key, "version": workflow.version},
         )
-
         self._run_execution(execution)
+        self._sync_event_status(execution)
         self.db.commit()
         self.db.refresh(execution)
         return execution
+
+    def _sync_event_status(self, execution: WorkflowExecution) -> None:
+        event = self.db.get(IncomingEvent, execution.incoming_event_id)
+        if event is None:
+            return
+        event.processing_started_at = None
+        if execution.status == WorkflowStatus.COMPLETED:
+            event.processing_status = EventProcessingStatus.COMPLETED
+            event.completed_at = execution.completed_at or datetime.now(UTC)
+            event.last_error = None
+        elif execution.status == WorkflowStatus.FAILED:
+            event.processing_status = EventProcessingStatus.FAILED
+            event.last_error = execution.error
+        else:
+            event.processing_status = EventProcessingStatus.PROCESSING
 
     def resume_after_approval(
         self, approval: ApprovalRequest, reviewer_id: uuid.UUID
@@ -243,6 +350,20 @@ class WorkflowEngine:
                 action_row = self.db.get(ActionExecution, uuid.UUID(action_id))
                 if action_row is not None and action_row.workflow_execution_id == execution.id:
                     action_row.approval_request_id = approval.id
+            if action_result.get("status") == "queued":
+                execute_step.output_data = {"action_executed": False, "action_result": action_result}
+                approval.final_execution_result = action_result
+                execution.context = {
+                    **execution.context,
+                    "action_result": action_result,
+                    "verified": False,
+                }
+                execution.status = WorkflowStatus.WAITING_EXTERNAL
+                execution.error = None
+                self._sync_event_status(execution)
+                self.db.commit()
+                self.db.refresh(execution)
+                return execution
             execution.context = {
                 **execution.context,
                 "action_result": action_result,
@@ -335,6 +456,20 @@ class WorkflowEngine:
                         )
                     )
                 context.update(result.output)
+
+                queued_action = result.output.get("action_result", {})
+                if queued_action.get("status") == "queued":
+                    execution.context = context
+                    execution.status = WorkflowStatus.WAITING_EXTERNAL
+                    execution.error = None
+                    self._audit(
+                        execution.organization_id,
+                        execution.id,
+                        "action_dispatch_queued",
+                        "system",
+                        {"action_id": queued_action.get("action_id")},
+                    )
+                    return
 
                 if result.status == StepStatus.AWAITING_APPROVAL:
                     approval_id = result.output.get("approval_id")
@@ -461,7 +596,7 @@ class WorkflowEngine:
             allowed = (
                 amount is not None
                 and Decimal(str(amount)).is_finite()
-                and 0 < Decimal(str(amount)) <= order.amount_usd
+                and 0 < Decimal(str(amount)) <= (order.amount_usd - order.refunded_amount_usd)
                 and Decimal(str(amount)) == Decimal(str(amount)).quantize(Decimal("0.01"))
                 and order.status == "completed"
                 and 0 <= age_days <= int(policy.get("refund_window_days", 0))
@@ -473,6 +608,9 @@ class WorkflowEngine:
                         "id": str(order.id),
                         "order_number": order.order_number,
                         "amount_usd": float(order.amount_usd),
+                        "refunded_amount_usd": float(order.refunded_amount_usd),
+                        "refundable_amount_usd": float(max(Decimal("0.00"), order.amount_usd - order.refunded_amount_usd)),
+                        "currency": order.currency,
                         "age_days": age_days,
                     },
                     "rule_result": {
@@ -583,11 +721,10 @@ class WorkflowEngine:
     def retry_failed_execution(
         self, execution: WorkflowExecution, *, force: bool = False
     ) -> WorkflowExecution:
-        """Retry a failed action with bounded exponential backoff.
+        """Retry only outcomes known to be safe to retry.
 
-        Automatic retries honor ``next_retry_at``; an authorized operator may
-        force a manual retry. Once max attempts are exhausted the action is
-        dead-lettered and remains observable for investigation.
+        UNKNOWN provider outcomes are intentionally excluded. They must be
+        reconciled first so a transport timeout cannot cause a duplicate refund.
         """
         execution = self.db.scalar(
             select(WorkflowExecution)
@@ -604,6 +741,8 @@ class WorkflowEngine:
         )
         if action is None:
             raise ValueError("Execution has no retryable action")
+        if action.status == ActionStatus.UNKNOWN:
+            raise ValueError("Provider outcome is unknown; reconcile before retrying")
         if action.status not in {ActionStatus.FAILED, ActionStatus.RETRYING}:
             raise ValueError("Action is not retryable")
         if action.attempt_count >= action.max_attempts:
@@ -622,131 +761,435 @@ class WorkflowEngine:
         now = datetime.now(UTC)
         if not force and action.next_retry_at is not None and action.next_retry_at > now:
             return execution
-
         integration = self.db.get(IntegrationConfig, action.integration_config_id)
         if integration is None or not integration.is_enabled:
             raise ValueError("Integration is disabled or missing")
         if integration.circuit_open_until and integration.circuit_open_until > now:
-            return execution
+            raise RuntimeError("integration_circuit_open")
 
         action.attempt_count += 1
-        action.status = ActionStatus.RETRYING
-        delay_seconds = self.retry_delay_seconds(action.attempt_count)
-        action.next_retry_at = now + timedelta(seconds=delay_seconds)
-        self._audit(
-            execution.organization_id,
-            execution.id,
-            "action_retry_scheduled",
-            "system",
-            {
-                "action_id": str(action.id),
-                "attempt": action.attempt_count,
-                "delay_seconds": delay_seconds,
-            },
+        action.status = ActionStatus.EXECUTING
+        action.error = None
+        action.next_retry_at = None
+        provider = get_refund_provider(integration)
+        result = provider.execute_refund(
+            integration,
+            order_number=str(action.request_payload["order_number"]),
+            amount_usd=Decimal(str(action.request_payload["amount_usd"])),
+            idempotency_key=action.idempotency_key,
+            external_order_id=action.request_payload.get("external_order_id"),
+            payment_reference=action.request_payload.get("payment_reference"),
+            payment_gateway=action.request_payload.get("payment_gateway"),
+            currency=str(action.request_payload.get("currency") or "USD"),
         )
-        try:
-            action.status = ActionStatus.EXECUTING
-            action.error = None
-            retry_started = time.perf_counter()
-            retry_step = StepExecution(
-                workflow_execution_id=execution.id,
-                step_key="execute.retry",
-                step_type=StepType.ACTION_EXECUTE,
-                status=StepStatus.RUNNING,
-                input_data=action.request_payload,
-                started_at=datetime.now(UTC),
-            )
-            self.db.add(retry_step)
-            self.db.flush()
-            # The demo timeout occurs only on the initial attempt. Retries reuse
-            # the original action row; no second refund action is inserted.
-            action.status = ActionStatus.SUCCEEDED
-            action.next_retry_at = None
-            integration.consecutive_failures = 0
-            integration.circuit_open_until = None
-            action.response_payload = action.response_payload or {
-                "provider": "mock_payments",
-                "refund_id": f"rf_{uuid.uuid4().hex[:12]}",
-            }
-            action.verified_at = datetime.now(UTC)
-            retry_step.status = StepStatus.SUCCEEDED
-            retry_step.output_data = {
-                "action_retried": True,
-                "action_id": str(action.id),
-                "response": action.response_payload,
-            }
-            retry_step.completed_at = datetime.now(UTC)
-            retry_step.latency_ms = int((time.perf_counter() - retry_started) * 1000)
-            verify_step = StepExecution(
-                workflow_execution_id=execution.id,
-                step_key="verify.retry",
-                step_type=StepType.VERIFICATION,
-                status=StepStatus.SUCCEEDED,
-                input_data={"action_id": str(action.id)},
-                output_data={"verified": True, "action_id": str(action.id)},
-                started_at=datetime.now(UTC),
-                completed_at=datetime.now(UTC),
-                latency_ms=0,
-            )
-            self.db.add(verify_step)
-            execution.current_step_key = "verify.retry"
+        self._record_action_attempt(action, integration, result, operation="retry")
+        self._apply_provider_result(action, integration, result)
+
+        if action.status == ActionStatus.SUCCEEDED:
             execution.status = WorkflowStatus.COMPLETED
             execution.completed_at = datetime.now(UTC)
             execution.error = None
-            result = {
+            final = {
                 "status": "succeeded",
                 "action_id": str(action.id),
                 "response": action.response_payload,
             }
-            execution.context = {**execution.context, "action_result": result, "verified": True}
+            execution.context = {**execution.context, "action_result": final, "verified": True}
             if action.approval_request_id:
                 approval = self.db.get(ApprovalRequest, action.approval_request_id)
-                approval.final_execution_result = result
+                if approval is not None:
+                    approval.final_execution_result = final
             self._audit(
                 execution.organization_id,
                 execution.id,
-                "action_retried_and_succeeded",
+                "action_retried_and_verified",
                 "system",
                 {"action_id": str(action.id), "attempt": action.attempt_count},
             )
-        except Exception as exc:  # noqa: BLE001
-            if "retry_step" in locals():
-                retry_step.status = StepStatus.FAILED
-                retry_step.error = str(exc)
-                retry_step.completed_at = datetime.now(UTC)
-                retry_step.latency_ms = int((time.perf_counter() - retry_started) * 1000)
-            if action.attempt_count >= action.max_attempts:
-                action.status = ActionStatus.DEAD_LETTER
-                action.next_retry_at = None
-                self._audit(
-                    execution.organization_id,
-                    execution.id,
-                    "action_dead_lettered",
-                    "system",
-                    {
-                        "action_id": str(action.id),
-                        "attempts": action.attempt_count,
-                        "error": str(exc),
-                    },
-                )
-            else:
-                action.status = ActionStatus.RETRYING
-                delay_seconds = self.retry_delay_seconds(action.attempt_count + 1)
-                action.next_retry_at = datetime.now(UTC) + timedelta(seconds=delay_seconds)
-            action.error = str(exc)
+        else:
             execution.status = WorkflowStatus.FAILED
-            execution.error = str(exc)
             execution.completed_at = datetime.now(UTC)
-            self._audit(
-                execution.organization_id,
-                execution.id,
-                "action_retry_failed",
-                "system",
-                {"action_id": str(action.id), "attempt": action.attempt_count, "error": str(exc)},
-            )
+            execution.error = action.error or "provider_action_failed"
         self.db.commit()
         self.db.refresh(execution)
         return execution
+
+    def reconcile_action(self, action: ActionExecution) -> ActionExecution:
+        """Ask the provider what happened without issuing the side effect again."""
+        action = self.db.scalar(
+            select(ActionExecution)
+            .where(ActionExecution.id == action.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        if action is None:
+            raise ValueError("Action not found")
+        integration = self.db.get(IntegrationConfig, action.integration_config_id)
+        if integration is None or not integration.is_enabled:
+            raise ValueError("Integration is disabled or missing")
+        provider = get_refund_provider(integration)
+        provider_operation_id = None
+        latest_attempt = self.db.scalar(
+            select(ActionAttempt)
+            .where(ActionAttempt.action_execution_id == action.id)
+            .order_by(ActionAttempt.created_at.desc())
+        )
+        if latest_attempt is not None:
+            provider_operation_id = latest_attempt.provider_operation_id
+        result = provider.reconcile_refund(
+            integration,
+            idempotency_key=action.idempotency_key,
+            provider_operation_id=provider_operation_id,
+        )
+        self._record_action_attempt(action, integration, result, operation="reconcile")
+        if result.verified:
+            self._apply_provider_result(action, integration, result)
+            self._complete_external_action(action)
+            self._audit(
+                action.organization_id, action.workflow_execution_id, "action_reconciled", "system",
+                {"action_id": str(action.id), "verified": True},
+            )
+        elif result.status == "not_found":
+            action.status = ActionStatus.RETRYING
+            action.error = "provider_confirmed_not_found"
+            action.next_retry_at = datetime.now(UTC)
+            enqueue_outbox(
+                self.db,
+                organization_id=action.organization_id,
+                topic="execute_action",
+                aggregate_type="action_execution",
+                aggregate_id=action.id,
+                payload={"action_id": str(action.id), "organization_id": str(action.organization_id)},
+                available_at=action.next_retry_at,
+            )
+            self._audit(
+                action.organization_id, action.workflow_execution_id, "action_reconciled", "system",
+                {"action_id": str(action.id), "verified": False, "safe_to_retry": True},
+            )
+        else:
+            action.status = ActionStatus.UNKNOWN
+            action.error = result.error or "provider_outcome_unknown"
+        self.db.commit()
+        self.db.refresh(action)
+        return action
+
+    def _select_refund_integration(self, execution: WorkflowExecution) -> IntegrationConfig:
+        organization = self.db.get(Organization, execution.organization_id)
+        if organization is None:
+            raise ValueError("Organization not found")
+        if organization.plan == "demo":
+            integration = self.db.scalar(
+                select(IntegrationConfig).where(
+                    IntegrationConfig.organization_id == execution.organization_id,
+                    IntegrationConfig.provider == IntegrationProvider.MOCK_PAYMENTS,
+                    IntegrationConfig.is_enabled.is_(True),
+                )
+            )
+            if integration is None:
+                integration = IntegrationConfig(
+                    organization_id=execution.organization_id,
+                    provider=IntegrationProvider.MOCK_PAYMENTS,
+                    config={"mode": "demo", "refund_enabled": True},
+                    is_enabled=True,
+                )
+                self.db.add(integration)
+                self.db.flush()
+            return integration
+
+        candidates = self.db.scalars(
+            select(IntegrationConfig).where(
+                IntegrationConfig.organization_id == execution.organization_id,
+                IntegrationConfig.provider.in_([
+                    IntegrationProvider.STRIPE,
+                    IntegrationProvider.SHOPIFY,
+                    IntegrationProvider.GENERIC_REST,
+                ]),
+                IntegrationConfig.is_enabled.is_(True),
+            )
+        ).all()
+        explicit = [row for row in candidates if bool((row.config or {}).get("refund_enabled"))]
+        if len(explicit) > 1:
+            raise ValueError("Multiple live refund integrations are marked as execution providers")
+        if len(explicit) == 1:
+            return explicit[0]
+        generic = [row for row in candidates if row.provider == IntegrationProvider.GENERIC_REST]
+        if len(candidates) == 1:
+            return candidates[0]
+        if len(generic) == 1:
+            return generic[0]
+        raise ValueError("No single live refund execution provider is configured")
+
+    def _record_action_attempt(
+        self, action: ActionExecution, integration: IntegrationConfig, result, *, operation: str
+    ) -> ActionAttempt:
+        attempt = ActionAttempt(
+            organization_id=action.organization_id,
+            action_execution_id=action.id,
+            attempt_number=action.attempt_count,
+            operation=operation,
+            provider=integration.provider.value,
+            provider_operation_id=result.provider_operation_id,
+            request_payload=action.request_payload,
+            response_payload=result.response,
+            outcome=result.status,
+            error=result.error,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+        )
+        self.db.add(attempt)
+        return attempt
+
+    def _apply_provider_result(self, action: ActionExecution, integration: IntegrationConfig, result) -> None:
+        action.response_payload = result.response
+        if result.verified:
+            action.status = ActionStatus.SUCCEEDED
+            action.verified_at = datetime.now(UTC)
+            action.error = None
+            action.next_retry_at = None
+            integration.consecutive_failures = 0
+            integration.circuit_open_until = None
+            return
+        integration.consecutive_failures += 1
+        if integration.consecutive_failures >= integration.failure_threshold:
+            integration.circuit_open_until = datetime.now(UTC) + timedelta(
+                seconds=integration.recovery_timeout_seconds
+            )
+        action.error = result.error or "provider_action_failed"
+        if result.unknown:
+            action.status = ActionStatus.UNKNOWN
+            action.next_retry_at = None
+        elif result.retryable and action.attempt_count < action.max_attempts:
+            action.status = ActionStatus.RETRYING
+            action.next_retry_at = datetime.now(UTC) + timedelta(
+                seconds=self.retry_delay_seconds(action.attempt_count)
+            )
+        elif action.attempt_count >= action.max_attempts:
+            action.status = ActionStatus.DEAD_LETTER
+            action.next_retry_at = None
+        else:
+            action.status = ActionStatus.FAILED
+            action.next_retry_at = None
+
+    def execute_queued_action(
+        self, action_id: uuid.UUID, *, worker_id: str = "celery"
+    ) -> ActionExecution:
+        """Execute one previously committed action intent.
+
+        The EXECUTING lease is committed before the provider call. If the worker
+        crashes after the provider sees the request, recovery changes the stale
+        action to UNKNOWN so it must be reconciled instead of blindly retried.
+        """
+        from app.integrations.providers import ProviderResult
+
+        action = self.db.scalar(
+            select(ActionExecution).where(ActionExecution.id == action_id).with_for_update()
+        )
+        if action is None:
+            raise ValueError("Action not found")
+        now = datetime.now(UTC)
+        if action.status == ActionStatus.SUCCEEDED:
+            return action
+        if action.status == ActionStatus.EXECUTING:
+            # A duplicate at-least-once delivery can arrive while another worker
+            # owns the lease. The recovery task handles genuinely stale leases.
+            return action
+        if action.status == ActionStatus.UNKNOWN:
+            raise ValueError("Provider outcome is unknown; reconcile before retrying")
+        if action.status in {ActionStatus.DEAD_LETTER, ActionStatus.FAILED, ActionStatus.ROLLED_BACK}:
+            raise ValueError(f"Action is not executable from status={action.status.value}")
+        if action.status == ActionStatus.RETRYING and action.next_retry_at and action.next_retry_at > now:
+            return action
+
+        integration = self.db.get(IntegrationConfig, action.integration_config_id)
+        if integration is None or not integration.is_enabled:
+            raise ValueError("Integration is disabled or missing")
+        execution = self.db.get(WorkflowExecution, action.workflow_execution_id)
+        if execution is None:
+            raise ValueError("Workflow execution not found")
+        organization = self.db.get(Organization, action.organization_id)
+        if organization is None:
+            raise ValueError("Organization not found")
+        if integration.provider != IntegrationProvider.MOCK_PAYMENTS and not bool(
+            (organization.settings or {}).get("live_execution_enabled")
+        ):
+            action.status = ActionStatus.FAILED
+            action.error = "live_execution_disabled"
+            action.locked_at = None
+            action.locked_by = None
+            action.next_retry_at = None
+            self._audit(
+                action.organization_id,
+                action.workflow_execution_id,
+                "action_blocked_by_live_execution_kill_switch",
+                "system",
+                {"action_id": str(action.id), "provider": integration.provider.value},
+            )
+            self._fail_external_action(action)
+            self.db.commit()
+            return action
+        if integration.circuit_open_until and integration.circuit_open_until > now:
+            action.status = ActionStatus.RETRYING
+            action.next_retry_at = integration.circuit_open_until
+            enqueue_outbox(
+                self.db,
+                organization_id=action.organization_id,
+                topic="execute_action",
+                aggregate_type="action_execution",
+                aggregate_id=action.id,
+                payload={"action_id": str(action.id), "organization_id": str(action.organization_id)},
+                available_at=action.next_retry_at,
+            )
+            self.db.commit()
+            return action
+
+        action.status = ActionStatus.EXECUTING
+        action.attempt_count += 1
+        action.next_retry_at = None
+        action.locked_at = now
+        action.locked_by = worker_id
+        attempt = ActionAttempt(
+            organization_id=action.organization_id,
+            action_execution_id=action.id,
+            attempt_number=action.attempt_count,
+            operation="execute",
+            provider=integration.provider.value,
+            provider_operation_id=None,
+            request_payload=action.request_payload,
+            response_payload=None,
+            outcome="in_progress",
+            error=None,
+            started_at=now,
+            completed_at=None,
+        )
+        self.db.add(attempt)
+        self.db.commit()
+
+        try:
+            provider = get_refund_provider(integration)
+            result = provider.execute_refund(
+                integration,
+                order_number=str(action.request_payload["order_number"]),
+                amount_usd=Decimal(str(action.request_payload["amount_usd"])),
+                idempotency_key=action.idempotency_key,
+                external_order_id=action.request_payload.get("external_order_id"),
+                payment_reference=action.request_payload.get("payment_reference"),
+                currency=str(action.request_payload.get("currency") or "USD"),
+            )
+        except Exception as exc:  # provider/config bugs are known local failures
+            result = ProviderResult(
+                status="failed",
+                response={},
+                retryable=False,
+                error=f"provider_adapter_error:{exc.__class__.__name__}",
+            )
+
+        action = self.db.scalar(
+            select(ActionExecution).where(ActionExecution.id == action_id).with_for_update()
+        )
+        if action is None:
+            raise ValueError("Action disappeared after provider execution")
+        integration = self.db.get(IntegrationConfig, action.integration_config_id)
+        attempt = self.db.get(ActionAttempt, attempt.id)
+        if integration is None or attempt is None:
+            raise ValueError("Action execution state is incomplete")
+
+        attempt.provider_operation_id = result.provider_operation_id
+        attempt.response_payload = result.response
+        attempt.outcome = result.status
+        attempt.error = result.error
+        attempt.completed_at = datetime.now(UTC)
+        self._apply_provider_result(action, integration, result)
+        action.locked_at = None
+        action.locked_by = None
+        self._audit(
+            action.organization_id,
+            action.workflow_execution_id,
+            "action_provider_result",
+            "system",
+            {
+                "action_id": str(action.id),
+                "provider": integration.provider.value,
+                "outcome": result.status,
+                "verified": result.verified,
+                "attempt": action.attempt_count,
+            },
+        )
+
+        if action.status == ActionStatus.SUCCEEDED:
+            self._complete_external_action(action)
+        elif action.status == ActionStatus.RETRYING and action.next_retry_at is not None:
+            enqueue_outbox(
+                self.db,
+                organization_id=action.organization_id,
+                topic="execute_action",
+                aggregate_type="action_execution",
+                aggregate_id=action.id,
+                payload={"action_id": str(action.id), "organization_id": str(action.organization_id)},
+                available_at=action.next_retry_at,
+            )
+        elif action.status in {ActionStatus.FAILED, ActionStatus.DEAD_LETTER}:
+            self._fail_external_action(action)
+        self.db.commit()
+        self.db.refresh(action)
+        return action
+
+    def _complete_external_action(self, action: ActionExecution) -> None:
+        execution = self.db.get(WorkflowExecution, action.workflow_execution_id)
+        if execution is None:
+            return
+        final = {
+            "status": "succeeded",
+            "action_id": str(action.id),
+            "response": action.response_payload,
+        }
+        execution.context = {**execution.context, "action_result": final, "verified": True}
+        existing_verify = self.db.scalar(
+            select(StepExecution).where(
+                StepExecution.workflow_execution_id == execution.id,
+                StepExecution.step_key == "verify",
+                StepExecution.status == StepStatus.SUCCEEDED,
+            )
+        )
+        if existing_verify is None:
+            now = datetime.now(UTC)
+            self.db.add(
+                StepExecution(
+                    workflow_execution_id=execution.id,
+                    step_key="verify",
+                    step_type=StepType.VERIFICATION,
+                    status=StepStatus.SUCCEEDED,
+                    input_data=execution.context,
+                    output_data={"verified": True, "action_id": str(action.id)},
+                    started_at=now,
+                    completed_at=now,
+                    latency_ms=0,
+                )
+            )
+        execution.current_step_key = "verify"
+        execution.status = WorkflowStatus.COMPLETED
+        execution.error = None
+        execution.completed_at = datetime.now(UTC)
+        if action.approval_request_id:
+            approval = self.db.get(ApprovalRequest, action.approval_request_id)
+            if approval is not None:
+                approval.final_execution_result = final
+        self._sync_event_status(execution)
+        self._audit(
+            execution.organization_id,
+            execution.id,
+            "execution_verified",
+            "system",
+            {"action_id": str(action.id), "durable_worker": True},
+        )
+
+    def _fail_external_action(self, action: ActionExecution) -> None:
+        execution = self.db.get(WorkflowExecution, action.workflow_execution_id)
+        if execution is None:
+            return
+        execution.status = WorkflowStatus.FAILED
+        execution.error = action.error or "provider_action_failed"
+        execution.completed_at = datetime.now(UTC)
+        self._sync_event_status(execution)
 
     def _execute_action(self, execution: WorkflowExecution, parameters: dict) -> dict:
         order_number = parameters.get("order_number")
@@ -755,15 +1198,18 @@ class WorkflowEngine:
             raise ValueError("Refund requires an order number")
         if isinstance(amount, bool) or not isinstance(amount, (int, float, str)):
             raise ValueError("Refund requires a numeric amount")
-        amount = Decimal(str(amount))
-        if not amount.is_finite() or amount <= 0 or amount != amount.quantize(Decimal("0.01")):
+        amount_decimal = Decimal(str(amount))
+        if (
+            not amount_decimal.is_finite()
+            or amount_decimal <= 0
+            or amount_decimal != amount_decimal.quantize(Decimal("0.01"))
+        ):
             raise ValueError("Refund amount must be positive, finite, and in whole cents")
         order = self._find_order(execution.organization_id, order_number)
-        if order is None or amount > order.amount_usd:
-            raise ValueError("Refund requires an existing order and cannot exceed its total")
-        # Canonical cents prevent 65, 65.0 and 65.00 from producing distinct keys.
-        idem = f"refund:{execution.organization_id}:{order_number}:{amount:.2f}"
-        amount = float(amount)
+        refundable = (order.amount_usd - order.refunded_amount_usd) if order is not None else Decimal("0.00")
+        if order is None or amount_decimal > refundable:
+            raise ValueError("Refund requires an existing order and cannot exceed its remaining refundable amount")
+        idem = f"refund:{execution.organization_id}:{order_number}:{amount_decimal:.2f}"
         existing = self.db.scalar(
             select(ActionExecution).where(ActionExecution.idempotency_key == idem)
         )
@@ -774,30 +1220,36 @@ class WorkflowEngine:
                     "action_id": str(existing.id),
                     "response": existing.response_payload,
                 }
+            if existing.status in {ActionStatus.PENDING, ActionStatus.RETRYING, ActionStatus.EXECUTING}:
+                return {"status": "queued", "action_id": str(existing.id), "response": None}
+            if existing.status == ActionStatus.UNKNOWN:
+                raise ValueError("Existing refund has unknown provider outcome; reconcile it first")
             raise ValueError(f"Existing refund action is not reusable: {existing.status.value}")
-        integration = self.db.scalar(
-            select(IntegrationConfig).where(
-                IntegrationConfig.organization_id == execution.organization_id,
-                IntegrationConfig.provider == IntegrationProvider.MOCK_PAYMENTS,
-            )
-        )
-        if integration is None:
-            integration = IntegrationConfig(
-                organization_id=execution.organization_id,
-                provider=IntegrationProvider.MOCK_PAYMENTS,
-                config={"mode": "demo"},
-                is_enabled=True,
-            )
-            self.db.add(integration)
-            self.db.flush()
-        if not integration.is_enabled:
-            raise ValueError("Integration is disabled")
+
+        integration = self._select_refund_integration(execution)
         now = datetime.now(UTC)
         if integration.circuit_open_until and integration.circuit_open_until > now:
             raise RuntimeError("integration_circuit_open")
-        request_payload = {"order_number": order_number, "amount_usd": amount}
-        if parameters.get("simulate_failure_once"):
-            request_payload["simulate_failure_once"] = True
+        request_payload = {
+            "order_number": order_number,
+            "amount_usd": float(amount_decimal),
+            "external_order_id": order.external_order_id,
+            "payment_reference": order.payment_reference,
+            "payment_gateway": order.payment_gateway,
+            "currency": order.currency,
+            "refundable_amount_usd": float(refundable),
+        }
+
+        # Demo keeps the immediate mock path so the portfolio sandbox remains
+        # interactive. Live tenants use the durable action-intent/outbox path and
+        # require the private-beta live-execution kill switch to be explicitly enabled.
+        is_demo_provider = integration.provider == IntegrationProvider.MOCK_PAYMENTS
+        organization = self.db.get(Organization, execution.organization_id)
+        if organization is None:
+            raise ValueError("Organization not found")
+        if not is_demo_provider and not bool((organization.settings or {}).get("live_execution_enabled")):
+            raise ValueError("live_execution_disabled")
+        assert_entitled(self.db, organization, "external_actions")
         action = ActionExecution(
             organization_id=execution.organization_id,
             workflow_execution_id=execution.id,
@@ -809,58 +1261,74 @@ class WorkflowEngine:
             action_type="refund",
             integration_config_id=integration.id,
             idempotency_key=idem,
-            status=ActionStatus.EXECUTING,
-            attempt_count=1,
+            status=ActionStatus.EXECUTING if is_demo_provider else ActionStatus.PENDING,
+            attempt_count=1 if is_demo_provider else 0,
             request_payload=request_payload,
             max_attempts=3,
         )
         self.db.add(action)
         self.db.flush()
-        if request_payload.get("simulate_failure_once"):
-            action.status = ActionStatus.RETRYING
-            action.next_retry_at = datetime.now(UTC) + timedelta(
-                seconds=self.retry_delay_seconds(1)
+        increment_usage(self.db, execution.organization_id, "external_actions")
+
+        if not is_demo_provider:
+            enqueue_outbox(
+                self.db,
+                organization_id=execution.organization_id,
+                topic="execute_action",
+                aggregate_type="action_execution",
+                aggregate_id=action.id,
+                payload={"action_id": str(action.id), "organization_id": str(execution.organization_id)},
             )
-            action.error = "simulated_external_timeout"
-            integration.consecutive_failures += 1
-            if integration.consecutive_failures >= integration.failure_threshold:
-                integration.circuit_open_until = datetime.now(UTC) + timedelta(
-                    seconds=integration.recovery_timeout_seconds
-                )
             self._audit(
                 execution.organization_id,
                 execution.id,
-                "action_failed",
+                "action_intent_created",
                 "system",
-                {"action_id": str(action.id), "error": action.error},
+                {"action_id": str(action.id), "provider": integration.provider.value},
             )
-            raise RuntimeError(action.error)
-        # Demo integration: persist the side effect rather than calling a real PSP.
-        integration.consecutive_failures = 0
-        integration.circuit_open_until = None
-        action.status = ActionStatus.SUCCEEDED
-        action.response_payload = {
-            "provider": "mock_payments",
-            "refund_id": f"rf_{uuid.uuid4().hex[:12]}",
-        }
-        action.verified_at = datetime.now(UTC)
-        result = {
+            return {"status": "queued", "action_id": str(action.id), "response": None}
+
+        # Keep the intentionally failing demo scenario isolated from live providers.
+        if parameters.get("simulate_failure_once"):
+            from app.integrations.providers import ProviderResult
+            result = ProviderResult(
+                status="retryable_failure", response={}, retryable=True, error="simulated_external_timeout"
+            )
+        else:
+            provider = get_refund_provider(integration)
+            result = provider.execute_refund(
+                integration,
+                order_number=order_number,
+                amount_usd=amount_decimal,
+                idempotency_key=idem,
+                external_order_id=order.external_order_id,
+                payment_reference=order.payment_reference,
+                payment_gateway=order.payment_gateway,
+                currency=order.currency,
+            )
+        self._record_action_attempt(action, integration, result, operation="execute")
+        self._apply_provider_result(action, integration, result)
+        self._audit(
+            execution.organization_id,
+            execution.id,
+            "action_provider_result",
+            "system",
+            {
+                "action_id": str(action.id),
+                "provider": integration.provider.value,
+                "outcome": result.status,
+                "verified": result.verified,
+            },
+        )
+        if action.status != ActionStatus.SUCCEEDED:
+            if action.status == ActionStatus.UNKNOWN:
+                raise RuntimeError("provider_outcome_unknown_reconciliation_required")
+            raise RuntimeError(action.error or "provider_action_failed")
+        return {
             "status": "succeeded",
             "action_id": str(action.id),
             "response": action.response_payload,
         }
-        self._audit(
-            execution.organization_id,
-            execution.id,
-            "action_executed",
-            "system",
-            {
-                "action_id": str(action.id),
-                "action_type": "refund",
-                "request": action.request_payload,
-            },
-        )
-        return result
 
     @staticmethod
     def _normalize(payload: dict) -> dict:

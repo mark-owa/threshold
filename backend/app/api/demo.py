@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.approvals import DecisionRequest, decide
 from app.api.auth import get_current_user
-from app.api.ops import get_org_membership
+from app.api.tenancy import require_demo_organization
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.models import Order, Organization, User, WorkflowExecution
@@ -37,7 +37,7 @@ def create_demo_event(
     )
     if org is None:
         raise HTTPException(status_code=404, detail="Organization not found")
-    get_org_membership(org.id, user.id, db)
+    require_demo_organization(org.id, user.id, db)
     try:
         execution = WorkflowEngine(db).ingest_and_run(
             organization_id=org.id,
@@ -69,7 +69,7 @@ def queue_demo_event(
     )
     if org is None:
         raise HTTPException(status_code=404, detail="Organization not found")
-    get_org_membership(org.id, user.id, db)
+    require_demo_organization(org.id, user.id, db)
     task = process_event.delay(
         str(org.id),
         request.source,
@@ -87,7 +87,7 @@ def get_demo_execution(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    get_org_membership(org_id, user.id, db)
+    require_demo_organization(org_id, user.id, db)
     execution = db.scalar(
         select(WorkflowExecution).where(
             WorkflowExecution.id == execution_id,
@@ -124,6 +124,7 @@ def decide_demo_approval(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    require_demo_organization(org_id, user.id, db)
     result = decide(approval_id, request, org_id, db, user)
     return {"execution_id": result["execution_id"], "status": result["status"]}
 
@@ -145,7 +146,7 @@ def run_demo_scenario(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    get_org_membership(org_id, user.id, db)
+    require_demo_organization(org_id, user.id, db)
     scenarios = {
         "low_risk_refund": {
             "text": "Please refund order #ORD-1002 for $65.00",

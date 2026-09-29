@@ -17,7 +17,7 @@ class Organization(Base, UUIDPKMixin, TimestampMixin):
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
-    plan: Mapped[str] = mapped_column(String(50), default="demo", nullable=False)
+    plan: Mapped[str] = mapped_column(String(50), default="trial", nullable=False)
     settings: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
@@ -60,6 +60,36 @@ class OrganizationMember(Base, UUIDPKMixin, TimestampMixin):
 
     organization: Mapped["Organization"] = relationship(back_populates="members")
     user: Mapped["User"] = relationship(back_populates="memberships")
+
+
+class OrganizationInvitation(Base, UUIDPKMixin, TimestampMixin):
+    """A revocable, expiring invitation to join one tenant.
+
+    Only a SHA-256 hash of the bearer token is persisted. The raw token is
+    returned once to the inviting administrator so it can be delivered by the
+    caller until email delivery is wired in.
+    """
+
+    __tablename__ = "organization_invitations"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "email", name="uq_org_invitation_email"),
+    )
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        GUID, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    role: Mapped[MemberRole] = mapped_column(enum_column(MemberRole), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    invited_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    organization: Mapped["Organization"] = relationship()
+    invited_by: Mapped["User | None"] = relationship(foreign_keys=[invited_by_id])
 
 
 class APIKey(Base, UUIDPKMixin, TimestampMixin):

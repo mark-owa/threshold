@@ -1,0 +1,37 @@
+name: Private Beta Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "HTTPS Threshold staging URL"
+        required: true
+      organization_id:
+        description: "Private-beta organization UUID"
+        required: true
+
+jobs:
+  deployed-smoke:
+    runs-on: ubuntu-latest
+    environment: private-beta
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install smoke dependency
+        run: pip install httpx==0.28.1
+      - name: Run non-destructive staging smoke + beta gate
+        env:
+          BETA_BASE_URL: ${{ inputs.base_url }}
+          BETA_ORG_ID: ${{ inputs.organization_id }}
+          BETA_OWNER_EMAIL: ${{ secrets.BETA_OWNER_EMAIL }}
+          BETA_OWNER_PASSWORD: ${{ secrets.BETA_OWNER_PASSWORD }}
+        working-directory: backend
+        run: python -m scripts.staging_smoke --output ../beta-smoke-report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: beta-smoke-report
+          path: beta-smoke-report.json
+          if-no-files-found: ignore
