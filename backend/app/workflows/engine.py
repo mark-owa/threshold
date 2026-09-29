@@ -770,7 +770,7 @@ class WorkflowEngine:
         if integration is None or not integration.is_enabled:
             raise ValueError("Integration is disabled or missing")
         if integration.circuit_open_until and integration.circuit_open_until > now:
-            raise RuntimeError("integration_circuit_open")
+            return execution
 
         action.attempt_count += 1
         action.status = ActionStatus.EXECUTING
