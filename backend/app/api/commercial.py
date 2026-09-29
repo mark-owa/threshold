@@ -145,7 +145,7 @@ def _reserve_webhook_receipt(
     )
     try:
         db.flush()
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
         existing = db.scalar(
             select(ExternalWebhookReceipt).where(
@@ -157,7 +157,7 @@ def _reserve_webhook_receipt(
             return False
         raise HTTPException(
             status_code=409, detail="Webhook delivery conflicted with another request"
-        )
+        ) from exc
     return True
 
 
@@ -521,7 +521,6 @@ async def stripe_billing_webhook(request: Request, db: Session = Depends(get_db)
     obj = (event.get("data") or {}).get("object") or {}
     metadata = obj.get("metadata") or {}
     org_value = metadata.get("threshold_org_id") or obj.get("client_reference_id")
-    subscription = None
     if event_type == "checkout.session.completed":
         subscription_id = obj.get("subscription")
         customer_id = obj.get("customer")
@@ -564,7 +563,6 @@ async def stripe_billing_webhook(request: Request, db: Session = Depends(get_db)
             db.commit()
             return {"received": True, "ignored": "unknown_workspace"}
         billing = get_or_create_billing_account(db, organization)
-        subscription = obj
         first_item = ((obj.get("items") or {}).get("data") or [{}])[0]
         price = first_item.get("price") or {}
         price_id = price.get("id")
