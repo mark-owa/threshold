@@ -113,6 +113,14 @@ def test_readiness_check_and_configuration_branches():
     }
     assert stale["restore_drill"].level == "block"
 
+    naive = {
+        row.key: row
+        for row in configuration_checks(
+            _settings(BETA_LAST_RESTORE_DRILL_AT=datetime.now(UTC).replace(tzinfo=None).isoformat())
+        )
+    }
+    assert naive["restore_drill"].level == "pass"
+
 
 class _RevisionResult:
     def __init__(self, value):
@@ -141,6 +149,42 @@ def test_schema_check_success_mismatch_and_failure():
     failed = _db_schema_check(_FakeDB(error=RuntimeError("db down")))
     assert failed.level == "block"
     assert "RuntimeError" in failed.detail
+
+
+def test_runtime_probe_success_paths(monkeypatch):
+    import redis
+    from app.workers import celery_app as celery_module
+
+    class RedisClient:
+        def ping(self):
+            return True
+
+    class RedisFactory:
+        @staticmethod
+        def from_url(url, **kwargs):
+            assert url
+            assert kwargs["socket_connect_timeout"] == 1
+            return RedisClient()
+
+    class Inspector:
+        def ping(self):
+            return {"worker@example": {"ok": "pong"}}
+
+    class Control:
+        def inspect(self, timeout):
+            assert timeout == 1.0
+            return Inspector()
+
+    class CeleryApp:
+        control = Control()
+
+    monkeypatch.setattr(redis, "Redis", RedisFactory)
+    monkeypatch.setattr(celery_module, "celery_app", CeleryApp())
+
+    assert beta_readiness._redis_check(_settings()).level == "pass"
+    celery = beta_readiness._celery_check()
+    assert celery.level == "pass"
+    assert "worker@example" in celery.detail
 
 
 def _add_member(db_session, org, email, role):
@@ -237,6 +281,24 @@ def test_tenant_checks_and_build_readiness_for_configured_workspace(db_session, 
     assert report["summary"]["block"] == 0
     assert report["summary"]["pass"] > 0
     assert report["organization_id"] == str(org.id)
+
+    monkeypatch.setattr(
+        beta_readiness,
+        "_redis_check",
+        lambda settings: ReadinessCheck("redis", "redis", "pass", "pong", "runtime"),
+    )
+    monkeypatch.setattr(
+        beta_readiness,
+        "_celery_check",
+        lambda: ReadinessCheck("celery_workers", "celery", "pass", "pong", "runtime"),
+    )
+    runtime_report = build_beta_readiness(
+        db_session,
+        org.id,
+        probe_runtime=True,
+        settings=_settings(),
+    )
+    assert runtime_report["ready"] is True
 
 
 def test_tenant_checks_missing_policy_integration_and_billing(db_session):
