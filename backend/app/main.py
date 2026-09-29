@@ -9,8 +9,8 @@ from app.api.commercial import router as commercial_router
 from app.api.demo import router as demo_router
 from app.api.ops import router as ops_router
 from app.api.organizations import router as organizations_router
-from app.api.workspace import router as workspace_router
 from app.api.webhooks import router as webhooks_router
+from app.api.workspace import router as workspace_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.core.middleware import (
@@ -74,11 +74,16 @@ def create_app() -> FastAPI:
             components["database"] = "ok"
             db = SessionLocal()
             try:
-                backlog = db.scalar(
-                    select(func.count())
-                    .select_from(OutboxMessage)
-                    .where(OutboxMessage.status.in_([OutboxStatus.PENDING, OutboxStatus.FAILED]))
-                ) or 0
+                backlog = (
+                    db.scalar(
+                        select(func.count())
+                        .select_from(OutboxMessage)
+                        .where(
+                            OutboxMessage.status.in_([OutboxStatus.PENDING, OutboxStatus.FAILED])
+                        )
+                    )
+                    or 0
+                )
             finally:
                 db.close()
         except Exception:
@@ -86,7 +91,10 @@ def create_app() -> FastAPI:
 
         try:
             import redis
-            client = redis.Redis.from_url(settings.REDIS_URL, socket_connect_timeout=1, socket_timeout=1)
+
+            client = redis.Redis.from_url(
+                settings.REDIS_URL, socket_connect_timeout=1, socket_timeout=1
+            )
             client.ping()
             components["redis"] = "ok"
         except Exception:

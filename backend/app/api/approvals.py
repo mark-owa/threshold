@@ -22,7 +22,6 @@ class DecisionRequest(BaseModel):
     modified_parameters: dict | None = None
 
 
-
 @router.post("/{approval_id}/decision")
 def decide(
     approval_id: UUID,

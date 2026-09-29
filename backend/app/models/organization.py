@@ -71,9 +71,7 @@ class OrganizationInvitation(Base, UUIDPKMixin, TimestampMixin):
     """
 
     __tablename__ = "organization_invitations"
-    __table_args__ = (
-        UniqueConstraint("organization_id", "email", name="uq_org_invitation_email"),
-    )
+    __table_args__ = (UniqueConstraint("organization_id", "email", name="uq_org_invitation_email"),)
 
     organization_id: Mapped[uuid.UUID] = mapped_column(
         GUID, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True

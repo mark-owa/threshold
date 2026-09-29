@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.ai.prompts import resolve_prompt
 from app.ai.providers import get_ai_provider
 from app.core.config import get_settings
+from app.integrations.providers import get_refund_provider
 from app.models import (
     ActionAttempt,
     ActionExecution,
@@ -40,9 +41,8 @@ from app.models.enums import (
     StepType,
     WorkflowStatus,
 )
-from app.integrations.providers import get_refund_provider
-from app.services.outbox import enqueue_outbox
 from app.services.commercial import assert_entitled, increment_usage
+from app.services.outbox import enqueue_outbox
 from app.workflows.primitives import (
     classify_text,
     extract_refund,
@@ -351,7 +351,10 @@ class WorkflowEngine:
                 if action_row is not None and action_row.workflow_execution_id == execution.id:
                     action_row.approval_request_id = approval.id
             if action_result.get("status") == "queued":
-                execute_step.output_data = {"action_executed": False, "action_result": action_result}
+                execute_step.output_data = {
+                    "action_executed": False,
+                    "action_result": action_result,
+                }
                 approval.final_execution_result = action_result
                 execution.context = {
                     **execution.context,
@@ -609,7 +612,9 @@ class WorkflowEngine:
                         "order_number": order.order_number,
                         "amount_usd": float(order.amount_usd),
                         "refunded_amount_usd": float(order.refunded_amount_usd),
-                        "refundable_amount_usd": float(max(Decimal("0.00"), order.amount_usd - order.refunded_amount_usd)),
+                        "refundable_amount_usd": float(
+                            max(Decimal("0.00"), order.amount_usd - order.refunded_amount_usd)
+                        ),
                         "currency": order.currency,
                         "age_days": age_days,
                     },
@@ -765,7 +770,7 @@ class WorkflowEngine:
         if integration is None or not integration.is_enabled:
             raise ValueError("Integration is disabled or missing")
         if integration.circuit_open_until and integration.circuit_open_until > now:
-            raise RuntimeError("integration_circuit_open")
+            return execution
 
         action.attempt_count += 1
         action.status = ActionStatus.EXECUTING
@@ -846,7 +851,10 @@ class WorkflowEngine:
             self._apply_provider_result(action, integration, result)
             self._complete_external_action(action)
             self._audit(
-                action.organization_id, action.workflow_execution_id, "action_reconciled", "system",
+                action.organization_id,
+                action.workflow_execution_id,
+                "action_reconciled",
+                "system",
                 {"action_id": str(action.id), "verified": True},
             )
         elif result.status == "not_found":
@@ -859,11 +867,17 @@ class WorkflowEngine:
                 topic="execute_action",
                 aggregate_type="action_execution",
                 aggregate_id=action.id,
-                payload={"action_id": str(action.id), "organization_id": str(action.organization_id)},
+                payload={
+                    "action_id": str(action.id),
+                    "organization_id": str(action.organization_id),
+                },
                 available_at=action.next_retry_at,
             )
             self._audit(
-                action.organization_id, action.workflow_execution_id, "action_reconciled", "system",
+                action.organization_id,
+                action.workflow_execution_id,
+                "action_reconciled",
+                "system",
                 {"action_id": str(action.id), "verified": False, "safe_to_retry": True},
             )
         else:
@@ -882,7 +896,6 @@ class WorkflowEngine:
                 select(IntegrationConfig).where(
                     IntegrationConfig.organization_id == execution.organization_id,
                     IntegrationConfig.provider == IntegrationProvider.MOCK_PAYMENTS,
-                    IntegrationConfig.is_enabled.is_(True),
                 )
             )
             if integration is None:
@@ -894,16 +907,20 @@ class WorkflowEngine:
                 )
                 self.db.add(integration)
                 self.db.flush()
+            elif not integration.is_enabled:
+                raise ValueError("Integration is disabled")
             return integration
 
         candidates = self.db.scalars(
             select(IntegrationConfig).where(
                 IntegrationConfig.organization_id == execution.organization_id,
-                IntegrationConfig.provider.in_([
-                    IntegrationProvider.STRIPE,
-                    IntegrationProvider.SHOPIFY,
-                    IntegrationProvider.GENERIC_REST,
-                ]),
+                IntegrationConfig.provider.in_(
+                    [
+                        IntegrationProvider.STRIPE,
+                        IntegrationProvider.SHOPIFY,
+                        IntegrationProvider.GENERIC_REST,
+                    ]
+                ),
                 IntegrationConfig.is_enabled.is_(True),
             )
         ).all()
@@ -939,7 +956,9 @@ class WorkflowEngine:
         self.db.add(attempt)
         return attempt
 
-    def _apply_provider_result(self, action: ActionExecution, integration: IntegrationConfig, result) -> None:
+    def _apply_provider_result(
+        self, action: ActionExecution, integration: IntegrationConfig, result
+    ) -> None:
         action.response_payload = result.response
         if result.verified:
             action.status = ActionStatus.SUCCEEDED
@@ -995,9 +1014,17 @@ class WorkflowEngine:
             return action
         if action.status == ActionStatus.UNKNOWN:
             raise ValueError("Provider outcome is unknown; reconcile before retrying")
-        if action.status in {ActionStatus.DEAD_LETTER, ActionStatus.FAILED, ActionStatus.ROLLED_BACK}:
+        if action.status in {
+            ActionStatus.DEAD_LETTER,
+            ActionStatus.FAILED,
+            ActionStatus.ROLLED_BACK,
+        }:
             raise ValueError(f"Action is not executable from status={action.status.value}")
-        if action.status == ActionStatus.RETRYING and action.next_retry_at and action.next_retry_at > now:
+        if (
+            action.status == ActionStatus.RETRYING
+            and action.next_retry_at
+            and action.next_retry_at > now
+        ):
             return action
 
         integration = self.db.get(IntegrationConfig, action.integration_config_id)
@@ -1036,7 +1063,10 @@ class WorkflowEngine:
                 topic="execute_action",
                 aggregate_type="action_execution",
                 aggregate_id=action.id,
-                payload={"action_id": str(action.id), "organization_id": str(action.organization_id)},
+                payload={
+                    "action_id": str(action.id),
+                    "organization_id": str(action.organization_id),
+                },
                 available_at=action.next_retry_at,
             )
             self.db.commit()
@@ -1124,7 +1154,10 @@ class WorkflowEngine:
                 topic="execute_action",
                 aggregate_type="action_execution",
                 aggregate_id=action.id,
-                payload={"action_id": str(action.id), "organization_id": str(action.organization_id)},
+                payload={
+                    "action_id": str(action.id),
+                    "organization_id": str(action.organization_id),
+                },
                 available_at=action.next_retry_at,
             )
         elif action.status in {ActionStatus.FAILED, ActionStatus.DEAD_LETTER}:
@@ -1206,9 +1239,13 @@ class WorkflowEngine:
         ):
             raise ValueError("Refund amount must be positive, finite, and in whole cents")
         order = self._find_order(execution.organization_id, order_number)
-        refundable = (order.amount_usd - order.refunded_amount_usd) if order is not None else Decimal("0.00")
+        refundable = (
+            (order.amount_usd - order.refunded_amount_usd) if order is not None else Decimal("0.00")
+        )
         if order is None or amount_decimal > refundable:
-            raise ValueError("Refund requires an existing order and cannot exceed its remaining refundable amount")
+            raise ValueError(
+                "Refund requires an existing order and cannot exceed its remaining refundable amount"
+            )
         idem = f"refund:{execution.organization_id}:{order_number}:{amount_decimal:.2f}"
         existing = self.db.scalar(
             select(ActionExecution).where(ActionExecution.idempotency_key == idem)
@@ -1220,7 +1257,11 @@ class WorkflowEngine:
                     "action_id": str(existing.id),
                     "response": existing.response_payload,
                 }
-            if existing.status in {ActionStatus.PENDING, ActionStatus.RETRYING, ActionStatus.EXECUTING}:
+            if existing.status in {
+                ActionStatus.PENDING,
+                ActionStatus.RETRYING,
+                ActionStatus.EXECUTING,
+            }:
                 return {"status": "queued", "action_id": str(existing.id), "response": None}
             if existing.status == ActionStatus.UNKNOWN:
                 raise ValueError("Existing refund has unknown provider outcome; reconcile it first")
@@ -1247,7 +1288,9 @@ class WorkflowEngine:
         organization = self.db.get(Organization, execution.organization_id)
         if organization is None:
             raise ValueError("Organization not found")
-        if not is_demo_provider and not bool((organization.settings or {}).get("live_execution_enabled")):
+        if not is_demo_provider and not bool(
+            (organization.settings or {}).get("live_execution_enabled")
+        ):
             raise ValueError("live_execution_disabled")
         assert_entitled(self.db, organization, "external_actions")
         action = ActionExecution(
@@ -1277,7 +1320,10 @@ class WorkflowEngine:
                 topic="execute_action",
                 aggregate_type="action_execution",
                 aggregate_id=action.id,
-                payload={"action_id": str(action.id), "organization_id": str(execution.organization_id)},
+                payload={
+                    "action_id": str(action.id),
+                    "organization_id": str(execution.organization_id),
+                },
             )
             self._audit(
                 execution.organization_id,
@@ -1291,8 +1337,12 @@ class WorkflowEngine:
         # Keep the intentionally failing demo scenario isolated from live providers.
         if parameters.get("simulate_failure_once"):
             from app.integrations.providers import ProviderResult
+
             result = ProviderResult(
-                status="retryable_failure", response={}, retryable=True, error="simulated_external_timeout"
+                status="retryable_failure",
+                response={},
+                retryable=True,
+                error="simulated_external_timeout",
             )
         else:
             provider = get_refund_provider(integration)

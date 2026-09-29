@@ -17,18 +17,23 @@ from app.models import (
     ApprovalRequest,
     AuditLogEntry,
     IncomingEvent,
-    OutboxMessage,
     Organization,
+    OutboxMessage,
     StepExecution,
     User,
     WorkflowExecution,
 )
 from app.models.enums import (
-    ActionStatus, ApprovalStatus, EventProcessingStatus, MemberRole, OutboxStatus, WorkflowStatus
+    ActionStatus,
+    ApprovalStatus,
+    EventProcessingStatus,
+    MemberRole,
+    OutboxStatus,
+    WorkflowStatus,
 )
-from app.workers.celery_app import celery_app
-from app.services.outbox import enqueue_outbox
 from app.services.beta_readiness import build_beta_readiness
+from app.services.outbox import enqueue_outbox
+from app.workers.celery_app import celery_app
 from app.workflows.engine import WorkflowEngine
 
 router = APIRouter(prefix=f"{get_settings().API_V1_PREFIX}/ops", tags=["operations"])
@@ -75,7 +80,9 @@ def set_live_execution(
 
     if request.enabled:
         if membership.role != MemberRole.OWNER:
-            raise HTTPException(status_code=403, detail="Owner permission required to enable live execution")
+            raise HTTPException(
+                status_code=403, detail="Owner permission required to enable live execution"
+            )
         report = build_beta_readiness(db, org_id, probe_runtime=True)
         if report["summary"]["block"]:
             raise HTTPException(
@@ -83,9 +90,7 @@ def set_live_execution(
                 detail={
                     "message": "Private-beta readiness blockers must be resolved before enabling live execution",
                     "summary": report["summary"],
-                    "blockers": [
-                        check for check in report["checks"] if check["level"] == "block"
-                    ],
+                    "blockers": [check for check in report["checks"] if check["level"] == "block"],
                 },
             )
 
@@ -99,7 +104,9 @@ def set_live_execution(
         AuditLogEntry(
             organization_id=org_id,
             workflow_execution_id=None,
-            event_type="workspace.live_execution_enabled" if request.enabled else "workspace.live_execution_disabled",
+            event_type="workspace.live_execution_enabled"
+            if request.enabled
+            else "workspace.live_execution_disabled",
             actor_type="human",
             actor_id=str(user.id),
             payload={"enabled": request.enabled},
@@ -111,7 +118,6 @@ def set_live_execution(
         "organization_id": str(org_id),
         "live_execution_enabled": bool((organization.settings or {}).get("live_execution_enabled")),
     }
-
 
 
 @router.get("/tasks/{task_id}")
@@ -552,9 +558,9 @@ def recovery_overview(
         select(IncomingEvent)
         .where(
             IncomingEvent.organization_id == org_id,
-            IncomingEvent.processing_status.in_([
-                EventProcessingStatus.FAILED, EventProcessingStatus.DEAD_LETTER
-            ]),
+            IncomingEvent.processing_status.in_(
+                [EventProcessingStatus.FAILED, EventProcessingStatus.DEAD_LETTER]
+            ),
         )
         .order_by(IncomingEvent.updated_at.desc())
         .limit(limit)
@@ -563,9 +569,9 @@ def recovery_overview(
         select(OutboxMessage)
         .where(
             OutboxMessage.organization_id == org_id,
-            OutboxMessage.status.in_([
-                OutboxStatus.PROCESSING, OutboxStatus.FAILED, OutboxStatus.DEAD_LETTER
-            ]),
+            OutboxMessage.status.in_(
+                [OutboxStatus.PROCESSING, OutboxStatus.FAILED, OutboxStatus.DEAD_LETTER]
+            ),
         )
         .order_by(OutboxMessage.updated_at.desc())
         .limit(limit)
@@ -574,9 +580,14 @@ def recovery_overview(
         select(ActionExecution)
         .where(
             ActionExecution.organization_id == org_id,
-            ActionExecution.status.in_([
-                ActionStatus.UNKNOWN, ActionStatus.RETRYING, ActionStatus.DEAD_LETTER, ActionStatus.FAILED
-            ]),
+            ActionExecution.status.in_(
+                [
+                    ActionStatus.UNKNOWN,
+                    ActionStatus.RETRYING,
+                    ActionStatus.DEAD_LETTER,
+                    ActionStatus.FAILED,
+                ]
+            ),
         )
         .order_by(ActionExecution.updated_at.desc())
         .limit(limit)
@@ -636,14 +647,16 @@ def replay_event(
     user: User = Depends(get_current_user),
 ):
     require_org_roles(
-        org_id, user.id, db,
+        org_id,
+        user.id,
+        db,
         {MemberRole.OWNER, MemberRole.ADMIN, MemberRole.REVIEWER},
         detail="Reviewer permission required",
     )
     event = db.scalar(
-        select(IncomingEvent).where(
-            IncomingEvent.id == event_id, IncomingEvent.organization_id == org_id
-        ).with_for_update()
+        select(IncomingEvent)
+        .where(IncomingEvent.id == event_id, IncomingEvent.organization_id == org_id)
+        .with_for_update()
     )
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")
@@ -655,7 +668,10 @@ def replay_event(
             status_code=409,
             detail="Event already has an execution; recover the execution/action instead of replaying input",
         )
-    if event.processing_status not in {EventProcessingStatus.FAILED, EventProcessingStatus.DEAD_LETTER}:
+    if event.processing_status not in {
+        EventProcessingStatus.FAILED,
+        EventProcessingStatus.DEAD_LETTER,
+    }:
         raise HTTPException(status_code=409, detail="Event is not in a replayable failure state")
     event.processing_status = EventProcessingStatus.RECEIVED
     event.processing_attempts = 0
@@ -672,8 +688,11 @@ def replay_event(
     )
     db.add(
         AuditLogEntry(
-            organization_id=org_id, workflow_execution_id=None,
-            event_type="event.manual_replay_queued", actor_type="human", actor_id=str(user.id),
+            organization_id=org_id,
+            workflow_execution_id=None,
+            event_type="event.manual_replay_queued",
+            actor_type="human",
+            actor_id=str(user.id),
             payload={"event_id": str(event.id)},
         )
     )
@@ -689,14 +708,16 @@ def requeue_outbox(
     user: User = Depends(get_current_user),
 ):
     require_org_roles(
-        org_id, user.id, db,
+        org_id,
+        user.id,
+        db,
         {MemberRole.OWNER, MemberRole.ADMIN},
         detail="Admin permission required",
     )
     row = db.scalar(
-        select(OutboxMessage).where(
-            OutboxMessage.id == message_id, OutboxMessage.organization_id == org_id
-        ).with_for_update()
+        select(OutboxMessage)
+        .where(OutboxMessage.id == message_id, OutboxMessage.organization_id == org_id)
+        .with_for_update()
     )
     if row is None:
         raise HTTPException(status_code=404, detail="Outbox message not found")
@@ -710,8 +731,11 @@ def requeue_outbox(
     row.last_error = None
     db.add(
         AuditLogEntry(
-            organization_id=org_id, workflow_execution_id=None,
-            event_type="outbox.manual_requeue", actor_type="human", actor_id=str(user.id),
+            organization_id=org_id,
+            workflow_execution_id=None,
+            event_type="outbox.manual_requeue",
+            actor_type="human",
+            actor_id=str(user.id),
             payload={"outbox_id": str(row.id), "topic": row.topic},
         )
     )

@@ -96,5 +96,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare production Compose environment
+        run: cp .env.example .env
       - name: Validate production Compose syntax
         run: docker compose -f docker-compose.prod.yml config --quiet

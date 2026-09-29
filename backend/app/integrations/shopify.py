@@ -6,7 +6,6 @@ import hmac
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
-from urllib.parse import quote
 
 import httpx
 from sqlalchemy import select
@@ -65,27 +64,42 @@ def snapshot_from_webhook(payload: dict) -> ShopifyOrderSnapshot:
     first = str(customer.get("first_name") or "").strip()
     last = str(customer.get("last_name") or "").strip()
     email = str(customer.get("email") or payload.get("email") or "").strip().lower()
-    customer_name = " ".join(part for part in (first, last) if part).strip() or email or "Shopify customer"
+    customer_name = (
+        " ".join(part for part in (first, last) if part).strip() or email or "Shopify customer"
+    )
     transactions = payload.get("transactions") or []
     payment_reference = None
     payment_gateway = None
     for tx in transactions:
-        candidate = tx.get("payment_id") or tx.get("authorization") or tx.get("admin_graphql_api_id")
+        candidate = (
+            tx.get("payment_id") or tx.get("authorization") or tx.get("admin_graphql_api_id")
+        )
         if candidate:
             payment_reference = str(tx.get("admin_graphql_api_id") or candidate)
             payment_gateway = str(tx.get("gateway") or "") or None
             break
-    refunded = sum((_money(item.get("amount")) for item in payload.get("refunds", []) if isinstance(item, dict)), Decimal("0.00"))
+    refunded = sum(
+        (
+            _money(item.get("amount"))
+            for item in payload.get("refunds", [])
+            if isinstance(item, dict)
+        ),
+        Decimal("0.00"),
+    )
     return ShopifyOrderSnapshot(
         external_order_id=order_id,
         order_number=order_name,
-        customer_external_id=str(customer.get("admin_graphql_api_id") or customer.get("id") or "") or None,
+        customer_external_id=str(customer.get("admin_graphql_api_id") or customer.get("id") or "")
+        or None,
         customer_name=customer_name,
         customer_email=email or f"unknown-{order_name}@shopify.local",
         currency=str(payload.get("currency") or "USD").upper(),
         total_amount=_money(payload.get("total_price") or payload.get("current_total_price")),
         refunded_amount=refunded,
-        status="completed" if str(payload.get("financial_status") or "").lower() in {"paid", "partially_refunded", "refunded"} else str(payload.get("financial_status") or "open").lower(),
+        status="completed"
+        if str(payload.get("financial_status") or "").lower()
+        in {"paid", "partially_refunded", "refunded"}
+        else str(payload.get("financial_status") or "open").lower(),
         ordered_at=_parse_datetime(payload.get("created_at") or payload.get("processed_at")),
         payment_reference=payment_reference,
         payment_gateway=payment_gateway,
@@ -119,7 +133,9 @@ def upsert_shopify_order(db: Session, organization_id, snapshot: ShopifyOrderSna
         db.flush()
     else:
         customer.name = snapshot.customer_name or customer.name
-        customer.external_customer_id = snapshot.customer_external_id or customer.external_customer_id
+        customer.external_customer_id = (
+            snapshot.customer_external_id or customer.external_customer_id
+        )
 
     order = db.scalar(
         select(Order).where(
@@ -227,12 +243,18 @@ class ShopifyAdminClient:
             external_order_id=str(node["id"]),
             order_number=str(node["name"]),
             customer_external_id=str(customer.get("id") or "") or None,
-            customer_name=str(customer.get("displayName") or customer.get("email") or "Shopify customer"),
-            customer_email=str(customer.get("email") or f"unknown-{normalized}@shopify.local").lower(),
+            customer_name=str(
+                customer.get("displayName") or customer.get("email") or "Shopify customer"
+            ),
+            customer_email=str(
+                customer.get("email") or f"unknown-{normalized}@shopify.local"
+            ).lower(),
             currency=str(total.get("currencyCode") or node.get("currencyCode") or "USD"),
             total_amount=_money(total.get("amount")),
             refunded_amount=_money(refunded.get("amount")),
-            status="completed" if str(node.get("displayFinancialStatus")) in {"PAID", "PARTIALLY_REFUNDED", "REFUNDED"} else str(node.get("displayFinancialStatus") or "OPEN").lower(),
+            status="completed"
+            if str(node.get("displayFinancialStatus")) in {"PAID", "PARTIALLY_REFUNDED", "REFUNDED"}
+            else str(node.get("displayFinancialStatus") or "OPEN").lower(),
             ordered_at=_parse_datetime(node.get("createdAt")),
             payment_reference=payment_reference,
             payment_gateway=payment_gateway,

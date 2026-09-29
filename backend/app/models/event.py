@@ -49,8 +49,12 @@ class IncomingEvent(Base, UUIDPKMixin, TimestampMixin):
 
     processing_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     max_processing_attempts: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
-    processing_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    next_retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    processing_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    next_retry_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 

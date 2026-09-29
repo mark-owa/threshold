@@ -88,14 +88,17 @@ def _assert_role_change_allowed(
                 detail="Only an owner can manage owner or admin roles",
             )
     if target.role == MemberRole.OWNER and new_role != MemberRole.OWNER:
-        owner_count = db.scalar(
-            select(func.count())
-            .select_from(OrganizationMember)
-            .where(
-                OrganizationMember.organization_id == target.organization_id,
-                OrganizationMember.role == MemberRole.OWNER,
+        owner_count = (
+            db.scalar(
+                select(func.count())
+                .select_from(OrganizationMember)
+                .where(
+                    OrganizationMember.organization_id == target.organization_id,
+                    OrganizationMember.role == MemberRole.OWNER,
+                )
             )
-        ) or 0
+            or 0
+        )
         if owner_count <= 1:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -139,7 +142,9 @@ def create_organization(
     slug = normalize_slug(request.slug)
     existing = db.scalar(select(Organization.id).where(Organization.slug == slug))
     if existing is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Workspace slug already exists")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Workspace slug already exists"
+        )
 
     organization = Organization(
         name=request.name.strip(),
@@ -363,7 +368,9 @@ def revoke_invitation(
     if invitation is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invitation not found")
     if invitation.accepted_at is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Invitation is already accepted")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Invitation is already accepted"
+        )
     invitation.revoked_at = datetime.now(UTC)
     db.add(
         AuditLogEntry(
@@ -437,14 +444,17 @@ def remove_member(
             detail="Only an owner can remove an owner or admin",
         )
     if target.role == MemberRole.OWNER:
-        owner_count = db.scalar(
-            select(func.count())
-            .select_from(OrganizationMember)
-            .where(
-                OrganizationMember.organization_id == org_id,
-                OrganizationMember.role == MemberRole.OWNER,
+        owner_count = (
+            db.scalar(
+                select(func.count())
+                .select_from(OrganizationMember)
+                .where(
+                    OrganizationMember.organization_id == org_id,
+                    OrganizationMember.role == MemberRole.OWNER,
+                )
             )
-        ) or 0
+            or 0
+        )
         if owner_count <= 1:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

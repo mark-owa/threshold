@@ -15,9 +15,15 @@ from app.models.enums import IntegrationProvider
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Read-only connectivity probes for private-beta Shopify/Stripe integrations.")
+    parser = argparse.ArgumentParser(
+        description="Read-only connectivity probes for private-beta Shopify/Stripe integrations."
+    )
     parser.add_argument("--org-id", required=True)
-    parser.add_argument("--allow-live-stripe-key", action="store_true", help="Permit a sk_live_ key. Off by default for beta safety.")
+    parser.add_argument(
+        "--allow-live-stripe-key",
+        action="store_true",
+        help="Permit a sk_live_ key. Off by default for beta safety.",
+    )
     args = parser.parse_args()
     org_id = UUID(args.org_id)
     db = SessionLocal()
@@ -34,30 +40,54 @@ def main() -> int:
         stripe = next((x for x in rows if x.provider == IntegrationProvider.STRIPE), None)
 
         if shopify is None:
-            results.append({"provider": "shopify", "ok": False, "detail": "enabled integration missing"})
+            results.append(
+                {"provider": "shopify", "ok": False, "detail": "enabled integration missing"}
+            )
             failures += 1
         else:
             try:
                 client = ShopifyAdminClient(shopify)
-                data = client._graphql("query ThresholdBetaProbe { shop { id name myshopifyDomain } }", {})
+                data = client._graphql(
+                    "query ThresholdBetaProbe { shop { id name myshopifyDomain } }", {}
+                )
                 shop = data.get("shop") or {}
                 results.append({"provider": "shopify", "ok": bool(shop.get("id")), "shop": shop})
                 if not shop.get("id"):
                     failures += 1
             except Exception as exc:
-                results.append({"provider": "shopify", "ok": False, "detail": f"{exc.__class__.__name__}: {exc}"})
+                results.append(
+                    {
+                        "provider": "shopify",
+                        "ok": False,
+                        "detail": f"{exc.__class__.__name__}: {exc}",
+                    }
+                )
                 failures += 1
 
         if stripe is None:
-            results.append({"provider": "stripe", "ok": False, "detail": "enabled integration missing"})
+            results.append(
+                {"provider": "stripe", "ok": False, "detail": "enabled integration missing"}
+            )
             failures += 1
         else:
             secret = _credential_value(stripe.credential_ref)
             if not secret:
-                results.append({"provider": "stripe", "ok": False, "detail": "credential reference does not resolve"})
+                results.append(
+                    {
+                        "provider": "stripe",
+                        "ok": False,
+                        "detail": "credential reference does not resolve",
+                    }
+                )
                 failures += 1
             elif secret.startswith("sk_live_") and not args.allow_live_stripe_key:
-                results.append({"provider": "stripe", "ok": False, "detail": "live Stripe key refused; private-beta probe expects test mode"})
+                results.append(
+                    {
+                        "provider": "stripe",
+                        "ok": False,
+                        "detail": "live Stripe key refused; private-beta probe expects test mode",
+                    }
+                )
                 failures += 1
             else:
                 try:
@@ -65,18 +95,37 @@ def main() -> int:
                     validate_live_endpoint(url)
                     with httpx.Client(timeout=10, follow_redirects=False) as client:
                         response = client.get(url, headers={"Authorization": f"Bearer {secret}"})
-                    body = response.json() if response.headers.get("content-type", "").startswith("application/json") else {}
+                    body = (
+                        response.json()
+                        if response.headers.get("content-type", "").startswith("application/json")
+                        else {}
+                    )
                     ok = response.status_code == 200 and bool(body.get("id"))
-                    results.append({"provider": "stripe", "ok": ok, "account_id": body.get("id"), "http_status": response.status_code})
+                    results.append(
+                        {
+                            "provider": "stripe",
+                            "ok": ok,
+                            "account_id": body.get("id"),
+                            "http_status": response.status_code,
+                        }
+                    )
                     if not ok:
                         failures += 1
                 except Exception as exc:
-                    results.append({"provider": "stripe", "ok": False, "detail": f"{exc.__class__.__name__}: {exc}"})
+                    results.append(
+                        {
+                            "provider": "stripe",
+                            "ok": False,
+                            "detail": f"{exc.__class__.__name__}: {exc}",
+                        }
+                    )
                     failures += 1
     finally:
         db.close()
 
-    print(json.dumps({"organization_id": str(org_id), "results": results}, indent=2, sort_keys=True))
+    print(
+        json.dumps({"organization_id": str(org_id), "results": results}, indent=2, sort_keys=True)
+    )
     return 2 if failures else 0
 
 

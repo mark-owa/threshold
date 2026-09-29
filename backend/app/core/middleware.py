@@ -58,7 +58,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "no-referrer")
-        response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        response.headers.setdefault(
+            "Permissions-Policy", "camera=(), microphone=(), geolocation=()"
+        )
         response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
         response.headers.setdefault("Cross-Origin-Resource-Policy", "same-site")
         response.headers.setdefault(
@@ -66,7 +68,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
         )
         if settings.APP_ENV in {"staging", "production"}:
-            response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+            response.headers.setdefault(
+                "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+            )
         if request.url.path.startswith(f"{settings.API_V1_PREFIX}/auth"):
             response.headers.setdefault("Cache-Control", "no-store")
         return response
@@ -80,7 +84,9 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
         if raw_length:
             try:
                 if int(raw_length) > settings.MAX_REQUEST_BODY_BYTES:
-                    return JSONResponse(status_code=413, content={"detail": "Request body too large"})
+                    return JSONResponse(
+                        status_code=413, content={"detail": "Request body too large"}
+                    )
             except ValueError:
                 return JSONResponse(status_code=400, content={"detail": "Invalid Content-Length"})
         return await call_next(request)
@@ -112,7 +118,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
         limit = settings.RATE_LIMIT_PER_MINUTE
-        if path.endswith("/auth/login") or path.endswith("/auth/register") or path.endswith("/auth/join"):
+        if (
+            path.endswith("/auth/login")
+            or path.endswith("/auth/register")
+            or path.endswith("/auth/join")
+        ):
             limit = settings.AUTH_RATE_LIMIT_PER_MINUTE
         elif "/webhook" in path or path.endswith("/webhooks/shopify"):
             limit = settings.WEBHOOK_RATE_LIMIT_PER_MINUTE

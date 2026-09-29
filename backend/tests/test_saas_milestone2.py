@@ -76,9 +76,7 @@ def test_owner_can_create_refund_policy_and_onboarding_reflects_it(client, db_se
     org, owner, _ = make_owner(
         db_session, slug="policy-onboarding", email="policy-owner@example.com"
     )
-    before = client.get(
-        f"/api/v1/workspace/onboarding?org_id={org.id}", headers=auth_header(owner)
-    )
+    before = client.get(f"/api/v1/workspace/onboarding?org_id={org.id}", headers=auth_header(owner))
     assert before.status_code == 200
     before_steps = {step["key"]: step for step in before.json()["steps"]}
     assert before_steps["refund_policy"]["complete"] is False
@@ -94,16 +92,16 @@ def test_owner_can_create_refund_policy_and_onboarding_reflects_it(client, db_se
         },
     )
     assert update.status_code == 200
-    policy = db_session.query(Policy).filter_by(
-        organization_id=org.id, category=RequestCategory.REFUND_REQUEST
-    ).one()
+    policy = (
+        db_session.query(Policy)
+        .filter_by(organization_id=org.id, category=RequestCategory.REFUND_REQUEST)
+        .one()
+    )
     assert policy.structured_rules == {
         "refund_window_days": 30,
         "max_auto_refund_usd": 75.5,
     }
 
-    after = client.get(
-        f"/api/v1/workspace/onboarding?org_id={org.id}", headers=auth_header(owner)
-    )
+    after = client.get(f"/api/v1/workspace/onboarding?org_id={org.id}", headers=auth_header(owner))
     after_steps = {step["key"]: step for step in after.json()["steps"]}
     assert after_steps["refund_policy"]["complete"] is True

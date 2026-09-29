@@ -24,7 +24,9 @@ class BillingAccount(Base, UUIDPKMixin, TimestampMixin):
     subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     subscription_status: Mapped[str] = mapped_column(String(50), default="trialing", nullable=False)
     price_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    current_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    current_period_end: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     trial_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     cancel_at_period_end: Mapped[bool] = mapped_column(default=False, nullable=False)
     metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)

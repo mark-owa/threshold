@@ -92,6 +92,7 @@ def sync_shopify_order(event_id: str, organization_id: str) -> str:
         if not isinstance(payload, dict):
             raise ValueError("Shopify event payload is invalid")
         from app.integrations.shopify import snapshot_from_webhook, upsert_shopify_order
+
         snapshot = snapshot_from_webhook(payload)
         order = upsert_shopify_order(db, event.organization_id, snapshot)
         event.normalized_payload = {
@@ -322,7 +323,10 @@ def recover_stale_events(limit: int = 100) -> int:
                     topic="process_incoming_event",
                     aggregate_type="incoming_event",
                     aggregate_id=event.id,
-                    payload={"event_id": str(event.id), "organization_id": str(event.organization_id)},
+                    payload={
+                        "event_id": str(event.id),
+                        "organization_id": str(event.organization_id),
+                    },
                     available_at=event.next_retry_at,
                 )
         db.commit()

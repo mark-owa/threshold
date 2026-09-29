@@ -1,5 +1,5 @@
-from decimal import Decimal
 import secrets
+from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,6 +11,7 @@ from app.api.auth import get_current_user
 from app.api.tenancy import get_active_organization, get_org_membership, require_org_roles
 from app.core.config import get_settings
 from app.db.session import get_db
+from app.integrations.providers import validate_live_endpoint
 from app.models import (
     AuditLogEntry,
     IntegrationConfig,
@@ -20,12 +21,9 @@ from app.models import (
     WebhookEndpoint,
     WorkflowDefinition,
 )
-from app.integrations.providers import validate_live_endpoint
 from app.models.enums import IntegrationProvider, MemberRole, RequestCategory
 
 router = APIRouter(prefix=f"{get_settings().API_V1_PREFIX}/workspace", tags=["workspace"])
-
-
 
 
 class GenericRestIntegrationRequest(BaseModel):
@@ -208,9 +206,7 @@ def list_policies(
 ):
     get_org_membership(org_id, user.id, db)
     rows = db.scalars(
-        select(Policy)
-        .where(Policy.organization_id == org_id)
-        .order_by(Policy.category.asc())
+        select(Policy).where(Policy.organization_id == org_id).order_by(Policy.category.asc())
     ).all()
     return [_serialize_policy(row) for row in rows]
 
@@ -314,11 +310,24 @@ def upsert_generic_rest_integration(
     )
     if organization.plan == "demo":
         from fastapi import HTTPException
-        raise HTTPException(status_code=409, detail="Demo workspaces use isolated mock integrations")
+
+        raise HTTPException(
+            status_code=409, detail="Demo workspaces use isolated mock integrations"
+        )
     base_url = request.base_url.rstrip("/")
     validate_live_endpoint(base_url)
-    for template in (request.refund_path, request.verify_path_template, request.reconcile_path_template):
-        validate_live_endpoint(base_url + "/" + template.lstrip("/").replace("{provider_operation_id}", "probe").replace("{idempotency_key}", "probe"))
+    for template in (
+        request.refund_path,
+        request.verify_path_template,
+        request.reconcile_path_template,
+    ):
+        validate_live_endpoint(
+            base_url
+            + "/"
+            + template.lstrip("/")
+            .replace("{provider_operation_id}", "probe")
+            .replace("{idempotency_key}", "probe")
+        )
 
     row = db.scalar(
         select(IntegrationConfig).where(
@@ -380,17 +389,38 @@ def upsert_shopify_integration(
     user: User = Depends(get_current_user),
 ):
     organization = get_active_organization(org_id, user.id, db)
-    require_org_roles(org_id, user.id, db, {MemberRole.OWNER, MemberRole.ADMIN}, detail="Admin permission required to manage integrations")
+    require_org_roles(
+        org_id,
+        user.id,
+        db,
+        {MemberRole.OWNER, MemberRole.ADMIN},
+        detail="Admin permission required to manage integrations",
+    )
     if organization.plan == "demo":
-        raise HTTPException(status_code=409, detail="Demo workspaces use isolated mock integrations")
-    shop_domain = request.shop_domain.strip().lower().removeprefix("https://").removeprefix("http://").rstrip("/")
+        raise HTTPException(
+            status_code=409, detail="Demo workspaces use isolated mock integrations"
+        )
+    shop_domain = (
+        request.shop_domain.strip()
+        .lower()
+        .removeprefix("https://")
+        .removeprefix("http://")
+        .rstrip("/")
+    )
     if not shop_domain.endswith(".myshopify.com"):
         raise HTTPException(status_code=422, detail="Shopify domain must end with .myshopify.com")
     validate_live_endpoint(f"https://{shop_domain}/admin/api/{request.api_version}/graphql.json")
-    row = db.scalar(select(IntegrationConfig).where(IntegrationConfig.organization_id == org_id, IntegrationConfig.provider == IntegrationProvider.SHOPIFY))
+    row = db.scalar(
+        select(IntegrationConfig).where(
+            IntegrationConfig.organization_id == org_id,
+            IntegrationConfig.provider == IntegrationProvider.SHOPIFY,
+        )
+    )
     created = row is None
     if row is None:
-        row = IntegrationConfig(organization_id=org_id, provider=IntegrationProvider.SHOPIFY, config={})
+        row = IntegrationConfig(
+            organization_id=org_id, provider=IntegrationProvider.SHOPIFY, config={}
+        )
         db.add(row)
     row.config = {
         "shop_domain": shop_domain,
@@ -401,10 +431,31 @@ def upsert_shopify_integration(
     }
     row.credential_ref = request.credential_ref
     row.is_enabled = request.is_enabled
-    db.add(AuditLogEntry(organization_id=org_id, workflow_execution_id=None, event_type="integration.created" if created else "integration.updated", actor_type="human", actor_id=str(user.id), payload={"provider": "shopify", "shop_domain": shop_domain, "refund_enabled": request.refund_enabled, "credential_configured": True}))
+    db.add(
+        AuditLogEntry(
+            organization_id=org_id,
+            workflow_execution_id=None,
+            event_type="integration.created" if created else "integration.updated",
+            actor_type="human",
+            actor_id=str(user.id),
+            payload={
+                "provider": "shopify",
+                "shop_domain": shop_domain,
+                "refund_enabled": request.refund_enabled,
+                "credential_configured": True,
+            },
+        )
+    )
     db.commit()
     db.refresh(row)
-    return {"id": str(row.id), "provider": row.provider.value, "is_enabled": row.is_enabled, "config": row.config, "credential_configured": True, "webhook_path": f"{get_settings().API_V1_PREFIX}/webhooks/shopify/{org_id}"}
+    return {
+        "id": str(row.id),
+        "provider": row.provider.value,
+        "is_enabled": row.is_enabled,
+        "config": row.config,
+        "credential_configured": True,
+        "webhook_path": f"{get_settings().API_V1_PREFIX}/webhooks/shopify/{org_id}",
+    }
 
 
 @router.put("/integrations/stripe")
@@ -415,22 +466,60 @@ def upsert_stripe_integration(
     user: User = Depends(get_current_user),
 ):
     organization = get_active_organization(org_id, user.id, db)
-    require_org_roles(org_id, user.id, db, {MemberRole.OWNER, MemberRole.ADMIN}, detail="Admin permission required to manage integrations")
+    require_org_roles(
+        org_id,
+        user.id,
+        db,
+        {MemberRole.OWNER, MemberRole.ADMIN},
+        detail="Admin permission required to manage integrations",
+    )
     if organization.plan == "demo":
-        raise HTTPException(status_code=409, detail="Demo workspaces use isolated mock integrations")
+        raise HTTPException(
+            status_code=409, detail="Demo workspaces use isolated mock integrations"
+        )
     validate_live_endpoint("https://api.stripe.com/v1/refunds")
-    row = db.scalar(select(IntegrationConfig).where(IntegrationConfig.organization_id == org_id, IntegrationConfig.provider == IntegrationProvider.STRIPE))
+    row = db.scalar(
+        select(IntegrationConfig).where(
+            IntegrationConfig.organization_id == org_id,
+            IntegrationConfig.provider == IntegrationProvider.STRIPE,
+        )
+    )
     created = row is None
     if row is None:
-        row = IntegrationConfig(organization_id=org_id, provider=IntegrationProvider.STRIPE, config={})
+        row = IntegrationConfig(
+            organization_id=org_id, provider=IntegrationProvider.STRIPE, config={}
+        )
         db.add(row)
-    row.config = {"api_version": request.api_version, "timeout_seconds": request.timeout_seconds, "refund_enabled": request.refund_enabled}
+    row.config = {
+        "api_version": request.api_version,
+        "timeout_seconds": request.timeout_seconds,
+        "refund_enabled": request.refund_enabled,
+    }
     row.credential_ref = request.credential_ref
     row.is_enabled = request.is_enabled
-    db.add(AuditLogEntry(organization_id=org_id, workflow_execution_id=None, event_type="integration.created" if created else "integration.updated", actor_type="human", actor_id=str(user.id), payload={"provider": "stripe", "refund_enabled": request.refund_enabled, "credential_configured": True}))
+    db.add(
+        AuditLogEntry(
+            organization_id=org_id,
+            workflow_execution_id=None,
+            event_type="integration.created" if created else "integration.updated",
+            actor_type="human",
+            actor_id=str(user.id),
+            payload={
+                "provider": "stripe",
+                "refund_enabled": request.refund_enabled,
+                "credential_configured": True,
+            },
+        )
+    )
     db.commit()
     db.refresh(row)
-    return {"id": str(row.id), "provider": row.provider.value, "is_enabled": row.is_enabled, "config": row.config, "credential_configured": True}
+    return {
+        "id": str(row.id),
+        "provider": row.provider.value,
+        "is_enabled": row.is_enabled,
+        "config": row.config,
+        "credential_configured": True,
+    }
 
 
 @router.post("/shopify/orders/sync")
@@ -440,18 +529,53 @@ def sync_shopify_order(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    require_org_roles(org_id, user.id, db, {MemberRole.OWNER, MemberRole.ADMIN, MemberRole.REVIEWER}, detail="Workspace membership required")
-    integration = db.scalar(select(IntegrationConfig).where(IntegrationConfig.organization_id == org_id, IntegrationConfig.provider == IntegrationProvider.SHOPIFY, IntegrationConfig.is_enabled.is_(True)))
+    require_org_roles(
+        org_id,
+        user.id,
+        db,
+        {MemberRole.OWNER, MemberRole.ADMIN, MemberRole.REVIEWER},
+        detail="Workspace membership required",
+    )
+    integration = db.scalar(
+        select(IntegrationConfig).where(
+            IntegrationConfig.organization_id == org_id,
+            IntegrationConfig.provider == IntegrationProvider.SHOPIFY,
+            IntegrationConfig.is_enabled.is_(True),
+        )
+    )
     if integration is None:
         raise HTTPException(status_code=409, detail="Shopify integration is not configured")
     from app.integrations.shopify import ShopifyAdminClient, upsert_shopify_order
+
     snapshot = ShopifyAdminClient(integration).fetch_order(order_number)
     if snapshot is None:
         raise HTTPException(status_code=404, detail="Shopify order not found")
     order = upsert_shopify_order(db, org_id, snapshot)
-    db.add(AuditLogEntry(organization_id=org_id, workflow_execution_id=None, event_type="shopify.order_synced", actor_type="human", actor_id=str(user.id), payload={"order_id": str(order.id), "order_number": order.order_number, "external_order_id": order.external_order_id}))
+    db.add(
+        AuditLogEntry(
+            organization_id=org_id,
+            workflow_execution_id=None,
+            event_type="shopify.order_synced",
+            actor_type="human",
+            actor_id=str(user.id),
+            payload={
+                "order_id": str(order.id),
+                "order_number": order.order_number,
+                "external_order_id": order.external_order_id,
+            },
+        )
+    )
     db.commit()
-    return {"id": str(order.id), "order_number": order.order_number, "external_order_id": order.external_order_id, "currency": order.currency, "total": float(order.amount_usd), "refunded": float(order.refunded_amount_usd), "refundable": float(max(Decimal("0.00"), order.amount_usd - order.refunded_amount_usd)), "payment_reference_configured": bool(order.payment_reference)}
+    return {
+        "id": str(order.id),
+        "order_number": order.order_number,
+        "external_order_id": order.external_order_id,
+        "currency": order.currency,
+        "total": float(order.amount_usd),
+        "refunded": float(order.refunded_amount_usd),
+        "refundable": float(max(Decimal("0.00"), order.amount_usd - order.refunded_amount_usd)),
+        "payment_reference_configured": bool(order.payment_reference),
+    }
 
 
 @router.get("/webhook-endpoints")
@@ -489,7 +613,10 @@ def create_webhook_endpoint(
     user: User = Depends(get_current_user),
 ):
     require_org_roles(
-        org_id, user.id, db, {MemberRole.OWNER, MemberRole.ADMIN},
+        org_id,
+        user.id,
+        db,
+        {MemberRole.OWNER, MemberRole.ADMIN},
         detail="Admin permission required to create webhook endpoints",
     )
     endpoint = WebhookEndpoint(
@@ -504,8 +631,11 @@ def create_webhook_endpoint(
     db.flush()
     db.add(
         AuditLogEntry(
-            organization_id=org_id, workflow_execution_id=None,
-            event_type="webhook.endpoint_created", actor_type="human", actor_id=str(user.id),
+            organization_id=org_id,
+            workflow_execution_id=None,
+            event_type="webhook.endpoint_created",
+            actor_type="human",
+            actor_id=str(user.id),
             payload={"endpoint_id": str(endpoint.id), "name": endpoint.name},
         )
     )
@@ -529,7 +659,10 @@ def disable_webhook_endpoint(
     user: User = Depends(get_current_user),
 ):
     require_org_roles(
-        org_id, user.id, db, {MemberRole.OWNER, MemberRole.ADMIN},
+        org_id,
+        user.id,
+        db,
+        {MemberRole.OWNER, MemberRole.ADMIN},
         detail="Admin permission required to disable webhook endpoints",
     )
     endpoint = db.scalar(
@@ -540,12 +673,16 @@ def disable_webhook_endpoint(
     )
     if endpoint is None:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail="Webhook endpoint not found")
     endpoint.is_active = False
     db.add(
         AuditLogEntry(
-            organization_id=org_id, workflow_execution_id=None,
-            event_type="webhook.endpoint_disabled", actor_type="human", actor_id=str(user.id),
+            organization_id=org_id,
+            workflow_execution_id=None,
+            event_type="webhook.endpoint_disabled",
+            actor_type="human",
+            actor_id=str(user.id),
             payload={"endpoint_id": str(endpoint.id), "name": endpoint.name},
         )
     )

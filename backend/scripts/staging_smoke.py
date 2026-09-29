@@ -15,7 +15,9 @@ def _must(response: httpx.Response, label: str) -> dict:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Non-destructive private-beta smoke test against a deployed Threshold instance.")
+    parser = argparse.ArgumentParser(
+        description="Non-destructive private-beta smoke test against a deployed Threshold instance."
+    )
     parser.add_argument("--base-url", default=os.getenv("BETA_BASE_URL", ""))
     parser.add_argument("--email", default=os.getenv("BETA_OWNER_EMAIL", ""))
     parser.add_argument("--password", default=os.getenv("BETA_OWNER_PASSWORD", ""))
@@ -32,7 +34,9 @@ def main() -> int:
         ready = client.get(f"{base}/health/ready")
         evidence["checks"]["readiness"] = ready.json()
         if ready.status_code != 200:
-            raise RuntimeError(f"service readiness failed: HTTP {ready.status_code} {ready.text[:400]}")
+            raise RuntimeError(
+                f"service readiness failed: HTTP {ready.status_code} {ready.text[:400]}"
+            )
 
         auth = _must(
             client.post(

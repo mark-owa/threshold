@@ -91,7 +91,9 @@ class ActionAttempt(Base, UUIDPKMixin, TimestampMixin):
     attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)
     operation: Mapped[str] = mapped_column(String(50), nullable=False, default="execute")
     provider: Mapped[str] = mapped_column(String(100), nullable=False)
-    provider_operation_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    provider_operation_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, index=True
+    )
     request_payload: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
     response_payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     outcome: Mapped[str] = mapped_column(String(50), nullable=False)

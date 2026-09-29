@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
-from app.services.beta_readiness import configuration_checks
 from app.core.config import Settings
+from app.services.beta_readiness import configuration_checks
 
 
 def _settings(**overrides):
@@ -30,10 +30,15 @@ def test_configuration_gate_blocks_development_runtime():
 
 
 def test_configuration_gate_blocks_http_public_url():
-    checks = {check.key: check for check in configuration_checks(_settings(PUBLIC_APP_URL="http://threshold.example.com"))}
+    checks = {
+        check.key: check
+        for check in configuration_checks(_settings(PUBLIC_APP_URL="http://threshold.example.com"))
+    }
     assert checks["https_public_url"].level == "block"
 
 
 def test_configuration_gate_requires_restore_drill_evidence():
-    checks = {check.key: check for check in configuration_checks(_settings(BETA_LAST_RESTORE_DRILL_AT=""))}
+    checks = {
+        check.key: check for check in configuration_checks(_settings(BETA_LAST_RESTORE_DRILL_AT=""))
+    }
     assert checks["restore_drill"].level == "block"

@@ -41,7 +41,9 @@ def test_stripe_billing_webhook_is_deduplicated(client, db_session, monkeypatch)
     assert first.status_code == 200
     assert second.status_code == 200
     assert second.json()["duplicate"] is True
-    rows = db_session.query(ExternalWebhookReceipt).filter_by(
-        provider="stripe_billing", event_id="evt_threshold_m7_duplicate"
-    ).all()
+    rows = (
+        db_session.query(ExternalWebhookReceipt)
+        .filter_by(provider="stripe_billing", event_id="evt_threshold_m7_duplicate")
+        .all()
+    )
     assert len(rows) == 1
