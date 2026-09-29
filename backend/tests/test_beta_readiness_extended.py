@@ -1,5 +1,5 @@
 from datetime import UTC, datetime, timedelta
-from types import SimpleNamespace
+from uuid import uuid4
 
 from app.core.config import Settings
 from app.models import (
@@ -157,7 +157,7 @@ def _add_member(db_session, org, email, role):
 
 
 def test_tenant_checks_block_missing_workspace(db_session):
-    checks = tenant_checks(db_session, Organization().id, _settings())
+    checks = tenant_checks(db_session, uuid4(), _settings())
     assert checks[0].key == "organization"
     assert checks[0].level == "block"
 
