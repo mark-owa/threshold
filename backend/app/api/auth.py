@@ -12,7 +12,13 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.security import create_access_token, decode_token, hash_password, verify_password
 from app.db.session import get_db
-from app.models import BillingAccount, Organization, OrganizationInvitation, OrganizationMember, User
+from app.models import (
+    BillingAccount,
+    Organization,
+    OrganizationInvitation,
+    OrganizationMember,
+    User,
+)
 from app.models.enums import MemberRole
 
 router = APIRouter(prefix=f"{get_settings().API_V1_PREFIX}/auth", tags=["auth"])

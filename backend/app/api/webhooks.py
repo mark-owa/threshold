@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.webhooks import verify_signature, webhook_secret_value
-from app.integrations.providers import _credential_value
 from app.db.session import get_db
 from app.models import AuditLogEntry, IncomingEvent, IntegrationConfig, WebhookEndpoint
 from app.models.enums import EventProcessingStatus, EventSource, IntegrationProvider
@@ -134,6 +133,7 @@ async def receive_shopify_webhook(
     db: Session = Depends(get_db),
 ):
     from uuid import UUID
+
     try:
         org_id = UUID(organization_id)
     except ValueError as exc:
@@ -151,21 +151,36 @@ async def receive_shopify_webhook(
     secret_ref = str((integration.config or {}).get("webhook_secret_ref") or "")
     secret = webhook_secret_value(secret_ref) if secret_ref else None
     if not secret:
-        raise HTTPException(status_code=503, detail="Shopify webhook signing secret is not configured")
+        raise HTTPException(
+            status_code=503, detail="Shopify webhook signing secret is not configured"
+        )
     from app.integrations.shopify import verify_shopify_hmac
+
     if not verify_shopify_hmac(secret, body, x_shopify_hmac_sha256):
         raise HTTPException(status_code=401, detail="Invalid Shopify webhook signature")
     try:
         payload = json.loads(body.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise HTTPException(status_code=400, detail="Shopify webhook body must be valid JSON") from exc
+        raise HTTPException(
+            status_code=400, detail="Shopify webhook body must be valid JSON"
+        ) from exc
     if not isinstance(payload, dict):
-        raise HTTPException(status_code=400, detail="Shopify webhook JSON payload must be an object")
+        raise HTTPException(
+            status_code=400, detail="Shopify webhook JSON payload must be an object"
+        )
 
     idempotency_key = f"shopify:{integration.id}:{x_shopify_webhook_id}"
-    existing = db.scalar(select(IncomingEvent).where(IncomingEvent.organization_id == org_id, IncomingEvent.idempotency_key == idempotency_key))
+    existing = db.scalar(
+        select(IncomingEvent).where(
+            IncomingEvent.organization_id == org_id,
+            IncomingEvent.idempotency_key == idempotency_key,
+        )
+    )
     if existing is not None:
-        return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content={"accepted": True, "duplicate": True, "event_id": str(existing.id)})
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content={"accepted": True, "duplicate": True, "event_id": str(existing.id)},
+        )
 
     event = IncomingEvent(
         organization_id=org_id,
@@ -185,9 +200,31 @@ async def receive_shopify_webhook(
     else:
         topic = "process_incoming_event"
     enqueue_outbox(
-        db, organization_id=org_id, topic=topic, aggregate_type="incoming_event", aggregate_id=event.id,
+        db,
+        organization_id=org_id,
+        topic=topic,
+        aggregate_type="incoming_event",
+        aggregate_id=event.id,
         payload={"event_id": str(event.id), "organization_id": str(org_id)},
     )
-    db.add(AuditLogEntry(organization_id=org_id, workflow_execution_id=None, event_type="shopify.webhook_accepted", actor_type="integration", actor_id=x_shopify_topic, payload={"event_id": str(event.id), "webhook_id": x_shopify_webhook_id, "topic": x_shopify_topic}))
+    db.add(
+        AuditLogEntry(
+            organization_id=org_id,
+            workflow_execution_id=None,
+            event_type="shopify.webhook_accepted",
+            actor_type="integration",
+            actor_id=x_shopify_topic,
+            payload={
+                "event_id": str(event.id),
+                "webhook_id": x_shopify_webhook_id,
+                "topic": x_shopify_topic,
+            },
+        )
+    )
     db.commit()
-    return {"accepted": True, "duplicate": False, "event_id": str(event.id), "topic": x_shopify_topic}
+    return {
+        "accepted": True,
+        "duplicate": False,
+        "event_id": str(event.id),
+        "topic": x_shopify_topic,
+    }

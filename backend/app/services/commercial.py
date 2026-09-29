@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 
 from app.models import BillingAccount, Organization, UsageCounter
 
-
 PLAN_CATALOG = {
     "trial": {
         "name": "Trial",
@@ -27,13 +26,31 @@ PLAN_CATALOG = {
         "name": "Business",
         "monthly_price_usd": 199,
         "limits": {"workflow_executions": 25000, "external_actions": 10000, "team_members": 25},
-        "features": ["refund_workflow", "approvals", "shopify", "stripe", "audit", "recovery", "priority_support"],
+        "features": [
+            "refund_workflow",
+            "approvals",
+            "shopify",
+            "stripe",
+            "audit",
+            "recovery",
+            "priority_support",
+        ],
     },
     "enterprise": {
         "name": "Enterprise",
         "monthly_price_usd": None,
         "limits": {"workflow_executions": None, "external_actions": None, "team_members": None},
-        "features": ["refund_workflow", "approvals", "shopify", "stripe", "audit", "recovery", "priority_support", "custom_retention", "sso_ready"],
+        "features": [
+            "refund_workflow",
+            "approvals",
+            "shopify",
+            "stripe",
+            "audit",
+            "recovery",
+            "priority_support",
+            "custom_retention",
+            "sso_ready",
+        ],
     },
     "demo": {
         "name": "Demo",
@@ -110,7 +127,11 @@ def assert_entitled(db: Session, organization: Organization, metric: str) -> Non
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail="Billing is not active for this workspace",
         )
-    if billing.trial_ends_at and billing.subscription_status == "trialing" and billing.trial_ends_at <= now:
+    if (
+        billing.trial_ends_at
+        and billing.subscription_status == "trialing"
+        and billing.trial_ends_at <= now
+    ):
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail="Trial expired. Choose a plan to continue live execution.",

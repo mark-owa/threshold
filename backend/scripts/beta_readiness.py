@@ -9,10 +9,14 @@ from app.services.beta_readiness import build_beta_readiness
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Evaluate Threshold private-beta readiness for one workspace.")
+    parser = argparse.ArgumentParser(
+        description="Evaluate Threshold private-beta readiness for one workspace."
+    )
     parser.add_argument("--org-id", required=True, help="Organization UUID")
     parser.add_argument("--no-runtime-probes", action="store_true", help="Skip Redis/Celery probes")
-    parser.add_argument("--strict-warnings", action="store_true", help="Exit nonzero when warnings remain")
+    parser.add_argument(
+        "--strict-warnings", action="store_true", help="Exit nonzero when warnings remain"
+    )
     parser.add_argument("--output", help="Optional JSON output path")
     args = parser.parse_args()
 

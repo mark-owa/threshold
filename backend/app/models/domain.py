@@ -50,7 +50,9 @@ class Order(Base, UUIDPKMixin, TimestampMixin):
     payment_gateway: Mapped[str | None] = mapped_column(String(100), nullable=True)
     currency: Mapped[str] = mapped_column(String(3), default="USD", nullable=False)
     amount_usd: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
-    refunded_amount_usd: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0.00"), nullable=False)
+    refunded_amount_usd: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2), default=Decimal("0.00"), nullable=False
+    )
     status: Mapped[str] = mapped_column(String(50), default="completed", nullable=False)
     ordered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 

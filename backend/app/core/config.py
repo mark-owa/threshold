@@ -89,7 +89,11 @@ class Settings(BaseSettings):
 
     @property
     def integration_allowed_hosts_list(self) -> set[str]:
-        return {host.strip().lower() for host in self.INTEGRATION_ALLOWED_HOSTS.split(",") if host.strip()}
+        return {
+            host.strip().lower()
+            for host in self.INTEGRATION_ALLOWED_HOSTS.split(",")
+            if host.strip()
+        }
 
 
 @lru_cache

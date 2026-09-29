@@ -5,8 +5,8 @@ rather than through passlib (fewer moving parts, no compatibility shims
 to track), and `PyJWT` for tokens. Login and current-user routes use these primitives.
 """
 
-from datetime import UTC, datetime, timedelta
 import uuid
+from datetime import UTC, datetime, timedelta
 
 import bcrypt
 import jwt

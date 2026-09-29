@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Literal
@@ -48,7 +47,9 @@ class ReadinessCheck:
         return asdict(self)
 
 
-def _check(key: str, title: str, level: ReadinessLevel, detail: str, category: str) -> ReadinessCheck:
+def _check(
+    key: str, title: str, level: ReadinessLevel, detail: str, category: str
+) -> ReadinessCheck:
     return ReadinessCheck(key=key, title=title, level=level, detail=detail, category=category)
 
 
@@ -82,12 +83,16 @@ def configuration_checks(settings: Settings | None = None) -> list[ReadinessChec
         _check(
             "cors_scope",
             "Restricted CORS origins",
-            "pass" if settings.cors_origins_list and "*" not in settings.cors_origins_list else "block",
+            "pass"
+            if settings.cors_origins_list and "*" not in settings.cors_origins_list
+            else "block",
             ", ".join(settings.cors_origins_list) or "No CORS origins configured",
             "security",
         )
     )
-    runtime_secrets_strong = len(settings.SECRET_KEY) >= 32 and len(settings.WEBHOOK_SIGNING_SECRET) >= 32
+    runtime_secrets_strong = (
+        len(settings.SECRET_KEY) >= 32 and len(settings.WEBHOOK_SIGNING_SECRET) >= 32
+    )
     checks.append(
         _check(
             "runtime_secret_strength",
@@ -102,9 +107,7 @@ def configuration_checks(settings: Settings | None = None) -> list[ReadinessChec
 
     ai_credential_present = (
         settings.AI_PROVIDER == "openai" and bool(settings.OPENAI_API_KEY)
-    ) or (
-        settings.AI_PROVIDER == "anthropic" and bool(settings.ANTHROPIC_API_KEY)
-    )
+    ) or (settings.AI_PROVIDER == "anthropic" and bool(settings.ANTHROPIC_API_KEY))
     if settings.AI_PROVIDER == "mock":
         ai_level: ReadinessLevel = "warn" if settings.BETA_ALLOW_MOCK_AI else "block"
         ai_detail = "Mock AI is enabled; set BETA_ALLOW_MOCK_AI=true only for a non-customer validation environment."
@@ -158,8 +161,12 @@ def configuration_checks(settings: Settings | None = None) -> list[ReadinessChec
             if parsed.tzinfo is None:
                 parsed = parsed.replace(tzinfo=UTC)
             age = datetime.now(UTC) - parsed.astimezone(UTC)
-            restore_fresh = timedelta(0) <= age <= timedelta(days=settings.BETA_MAX_RESTORE_DRILL_AGE_DAYS)
-            detail = f"Last restore drill: {parsed.astimezone(UTC).isoformat()} ({age.days} days ago)."
+            restore_fresh = (
+                timedelta(0) <= age <= timedelta(days=settings.BETA_MAX_RESTORE_DRILL_AGE_DAYS)
+            )
+            detail = (
+                f"Last restore drill: {parsed.astimezone(UTC).isoformat()} ({age.days} days ago)."
+            )
         except ValueError:
             restore_fresh = False
             detail = "BETA_LAST_RESTORE_DRILL_AT is not a valid ISO-8601 timestamp."
@@ -203,21 +210,43 @@ def _db_schema_check(db: Session) -> ReadinessCheck:
     try:
         revision = db.execute(text("SELECT version_num FROM alembic_version")).scalar_one_or_none()
     except Exception as exc:  # pragma: no cover - exercised in live beta gate
-        return _check("schema_revision", "Database schema at expected revision", "block", f"Could not read alembic_version: {exc.__class__.__name__}", "data")
+        return _check(
+            "schema_revision",
+            "Database schema at expected revision",
+            "block",
+            f"Could not read alembic_version: {exc.__class__.__name__}",
+            "data",
+        )
     if revision == EXPECTED_SCHEMA_REVISION:
-        return _check("schema_revision", "Database schema at expected revision", "pass", revision, "data")
-    return _check("schema_revision", "Database schema at expected revision", "block", f"Database={revision!s}; expected={EXPECTED_SCHEMA_REVISION}", "data")
+        return _check(
+            "schema_revision", "Database schema at expected revision", "pass", revision, "data"
+        )
+    return _check(
+        "schema_revision",
+        "Database schema at expected revision",
+        "block",
+        f"Database={revision!s}; expected={EXPECTED_SCHEMA_REVISION}",
+        "data",
+    )
 
 
 def _redis_check(settings: Settings) -> ReadinessCheck:
     try:
         import redis
 
-        client = redis.Redis.from_url(settings.REDIS_URL, socket_connect_timeout=1, socket_timeout=1)
+        client = redis.Redis.from_url(
+            settings.REDIS_URL, socket_connect_timeout=1, socket_timeout=1
+        )
         client.ping()
         return _check("redis", "Redis reachable", "pass", "Redis responded to PING.", "runtime")
     except Exception as exc:  # pragma: no cover - exercised in live beta gate
-        return _check("redis", "Redis reachable", "block", f"Redis unavailable: {exc.__class__.__name__}", "runtime")
+        return _check(
+            "redis",
+            "Redis reachable",
+            "block",
+            f"Redis unavailable: {exc.__class__.__name__}",
+            "runtime",
+        )
 
 
 def _celery_check() -> ReadinessCheck:
@@ -228,18 +257,48 @@ def _celery_check() -> ReadinessCheck:
         if replies:
             workers = ", ".join(sorted(replies))
             return _check("celery_workers", "Celery workers reachable", "pass", workers, "runtime")
-        return _check("celery_workers", "Celery workers reachable", "block", "No worker responded to Celery ping.", "runtime")
+        return _check(
+            "celery_workers",
+            "Celery workers reachable",
+            "block",
+            "No worker responded to Celery ping.",
+            "runtime",
+        )
     except Exception as exc:  # pragma: no cover - exercised in live beta gate
-        return _check("celery_workers", "Celery workers reachable", "block", f"Worker probe failed: {exc.__class__.__name__}", "runtime")
+        return _check(
+            "celery_workers",
+            "Celery workers reachable",
+            "block",
+            f"Worker probe failed: {exc.__class__.__name__}",
+            "runtime",
+        )
 
 
-def tenant_checks(db: Session, organization_id: UUID, settings: Settings | None = None) -> list[ReadinessCheck]:
+def tenant_checks(
+    db: Session, organization_id: UUID, settings: Settings | None = None
+) -> list[ReadinessCheck]:
     settings = settings or get_settings()
     checks: list[ReadinessCheck] = []
     organization = db.get(Organization, organization_id)
     if organization is None or not organization.is_active:
-        return [_check("organization", "Workspace active", "block", "Workspace does not exist or is disabled.", "tenant")]
-    checks.append(_check("organization", "Workspace active", "pass", f"{organization.name} ({organization.plan})", "tenant"))
+        return [
+            _check(
+                "organization",
+                "Workspace active",
+                "block",
+                "Workspace does not exist or is disabled.",
+                "tenant",
+            )
+        ]
+    checks.append(
+        _check(
+            "organization",
+            "Workspace active",
+            "pass",
+            f"{organization.name} ({organization.plan})",
+            "tenant",
+        )
+    )
     live_enabled = bool((organization.settings or {}).get("live_execution_enabled"))
     checks.append(
         _check(
@@ -278,13 +337,17 @@ def tenant_checks(db: Session, organization_id: UUID, settings: Settings | None 
             IntegrationConfig.is_enabled.is_(True),
         )
     ).all()
-    shopify = next((row for row in integrations if row.provider == IntegrationProvider.SHOPIFY), None)
+    shopify = next(
+        (row for row in integrations if row.provider == IntegrationProvider.SHOPIFY), None
+    )
     checks.append(
         _check(
             "shopify_integration",
             "Shopify store connected",
             "pass" if shopify else "block",
-            str((shopify.config or {}).get("shop_domain")) if shopify else "No enabled Shopify integration.",
+            str((shopify.config or {}).get("shop_domain"))
+            if shopify
+            else "No enabled Shopify integration.",
             "integrations",
         )
     )
@@ -307,7 +370,12 @@ def tenant_checks(db: Session, organization_id: UUID, settings: Settings | None 
     refund_integrations = [
         row
         for row in integrations
-        if row.provider in {IntegrationProvider.SHOPIFY, IntegrationProvider.STRIPE, IntegrationProvider.GENERIC_REST}
+        if row.provider
+        in {
+            IntegrationProvider.SHOPIFY,
+            IntegrationProvider.STRIPE,
+            IntegrationProvider.GENERIC_REST,
+        }
         and bool((row.config or {}).get("refund_enabled"))
     ]
     if len(refund_integrations) == 1:
@@ -335,14 +403,19 @@ def tenant_checks(db: Session, organization_id: UUID, settings: Settings | None 
             )
         )
 
-    human_reviewers = db.scalar(
-        select(func.count())
-        .select_from(OrganizationMember)
-        .where(
-            OrganizationMember.organization_id == organization_id,
-            OrganizationMember.role.in_([MemberRole.OWNER, MemberRole.ADMIN, MemberRole.REVIEWER]),
+    human_reviewers = (
+        db.scalar(
+            select(func.count())
+            .select_from(OrganizationMember)
+            .where(
+                OrganizationMember.organization_id == organization_id,
+                OrganizationMember.role.in_(
+                    [MemberRole.OWNER, MemberRole.ADMIN, MemberRole.REVIEWER]
+                ),
+            )
         )
-    ) or 0
+        or 0
+    )
     checks.append(
         _check(
             "reviewer_coverage",
@@ -353,26 +426,33 @@ def tenant_checks(db: Session, organization_id: UUID, settings: Settings | None 
         )
     )
 
-    billing = db.scalar(select(BillingAccount).where(BillingAccount.organization_id == organization_id))
+    billing = db.scalar(
+        select(BillingAccount).where(BillingAccount.organization_id == organization_id)
+    )
     billing_ok = billing is not None and billing.subscription_status in {"trialing", "active"}
     checks.append(
         _check(
             "billing_state",
             "Workspace entitlement state",
             "pass" if billing_ok else "block",
-            f"subscription_status={billing.subscription_status}" if billing else "No billing account exists.",
+            f"subscription_status={billing.subscription_status}"
+            if billing
+            else "No billing account exists.",
             "commercial",
         )
     )
 
-    unknown_actions = db.scalar(
-        select(func.count())
-        .select_from(ActionExecution)
-        .where(
-            ActionExecution.organization_id == organization_id,
-            ActionExecution.status.in_([ActionStatus.UNKNOWN, ActionStatus.DEAD_LETTER]),
+    unknown_actions = (
+        db.scalar(
+            select(func.count())
+            .select_from(ActionExecution)
+            .where(
+                ActionExecution.organization_id == organization_id,
+                ActionExecution.status.in_([ActionStatus.UNKNOWN, ActionStatus.DEAD_LETTER]),
+            )
         )
-    ) or 0
+        or 0
+    )
     checks.append(
         _check(
             "unresolved_actions",
@@ -383,22 +463,28 @@ def tenant_checks(db: Session, organization_id: UUID, settings: Settings | None 
         )
     )
 
-    dead_events = db.scalar(
-        select(func.count())
-        .select_from(IncomingEvent)
-        .where(
-            IncomingEvent.organization_id == organization_id,
-            IncomingEvent.processing_status == EventProcessingStatus.DEAD_LETTER,
+    dead_events = (
+        db.scalar(
+            select(func.count())
+            .select_from(IncomingEvent)
+            .where(
+                IncomingEvent.organization_id == organization_id,
+                IncomingEvent.processing_status == EventProcessingStatus.DEAD_LETTER,
+            )
         )
-    ) or 0
-    failed_events = db.scalar(
-        select(func.count())
-        .select_from(IncomingEvent)
-        .where(
-            IncomingEvent.organization_id == organization_id,
-            IncomingEvent.processing_status == EventProcessingStatus.FAILED,
+        or 0
+    )
+    failed_events = (
+        db.scalar(
+            select(func.count())
+            .select_from(IncomingEvent)
+            .where(
+                IncomingEvent.organization_id == organization_id,
+                IncomingEvent.processing_status == EventProcessingStatus.FAILED,
+            )
         )
-    ) or 0
+        or 0
+    )
     event_level: ReadinessLevel = "block" if dead_events else "warn" if failed_events else "pass"
     checks.append(
         _check(
@@ -410,22 +496,28 @@ def tenant_checks(db: Session, organization_id: UUID, settings: Settings | None 
         )
     )
 
-    dead_outbox = db.scalar(
-        select(func.count())
-        .select_from(OutboxMessage)
-        .where(
-            OutboxMessage.organization_id == organization_id,
-            OutboxMessage.status == OutboxStatus.DEAD_LETTER,
+    dead_outbox = (
+        db.scalar(
+            select(func.count())
+            .select_from(OutboxMessage)
+            .where(
+                OutboxMessage.organization_id == organization_id,
+                OutboxMessage.status == OutboxStatus.DEAD_LETTER,
+            )
         )
-    ) or 0
-    failed_outbox = db.scalar(
-        select(func.count())
-        .select_from(OutboxMessage)
-        .where(
-            OutboxMessage.organization_id == organization_id,
-            OutboxMessage.status == OutboxStatus.FAILED,
+        or 0
+    )
+    failed_outbox = (
+        db.scalar(
+            select(func.count())
+            .select_from(OutboxMessage)
+            .where(
+                OutboxMessage.organization_id == organization_id,
+                OutboxMessage.status == OutboxStatus.FAILED,
+            )
         )
-    ) or 0
+        or 0
+    )
     outbox_level: ReadinessLevel = "block" if dead_outbox else "warn" if failed_outbox else "pass"
     checks.append(
         _check(

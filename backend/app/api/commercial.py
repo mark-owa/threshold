@@ -11,7 +11,7 @@ from urllib.parse import urlencode
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -24,7 +24,6 @@ from app.db.session import get_db
 from app.integrations.providers import validate_live_endpoint
 from app.models import (
     AuditLogEntry,
-    BillingAccount,
     ExternalWebhookReceipt,
     IntegrationConfig,
     OAuthStateNonce,
@@ -33,7 +32,12 @@ from app.models import (
     User,
 )
 from app.models.enums import IntegrationProvider, MemberRole
-from app.services.commercial import PLAN_CATALOG, current_period_key, get_or_create_billing_account, get_plan
+from app.services.commercial import (
+    PLAN_CATALOG,
+    current_period_key,
+    get_or_create_billing_account,
+    get_plan,
+)
 
 settings = get_settings()
 router = APIRouter(prefix=f"{settings.API_V1_PREFIX}/commercial", tags=["commercial"])
@@ -46,7 +50,11 @@ class CheckoutRequest(BaseModel):
 def _sign_state(payload: dict) -> str:
     if not settings.SECRET_KEY:
         raise HTTPException(status_code=503, detail="OAuth state signing is not configured")
-    body = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode().rstrip("=")
+    body = (
+        base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode())
+        .decode()
+        .rstrip("=")
+    )
     sig = hmac.new(settings.SECRET_KEY.encode(), body.encode(), hashlib.sha256).hexdigest()
     return f"{body}.{sig}"
 
@@ -70,7 +78,9 @@ def _nonce_hash(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def _consume_oauth_nonce(db: Session, payload: dict, *, provider: str, subject: str) -> OAuthStateNonce:
+def _consume_oauth_nonce(
+    db: Session, payload: dict, *, provider: str, subject: str
+) -> OAuthStateNonce:
     nonce = str(payload.get("nonce") or "")
     try:
         org_id = UUID(str(payload["org_id"]))
@@ -84,7 +94,12 @@ def _consume_oauth_nonce(db: Session, payload: dict, *, provider: str, subject: 
         )
     )
     now = datetime.now(UTC)
-    if row is None or row.subject != subject or row.consumed_at is not None or row.expires_at <= now:
+    if (
+        row is None
+        or row.subject != subject
+        or row.consumed_at is not None
+        or row.expires_at <= now
+    ):
         raise HTTPException(status_code=400, detail="OAuth state has already been used or expired")
     row.consumed_at = now
     db.flush()
@@ -114,7 +129,9 @@ def _reserve_webhook_receipt(
     )
     if existing is not None:
         if existing.payload_sha256 != digest:
-            raise HTTPException(status_code=400, detail="Webhook event id was reused with a different payload")
+            raise HTTPException(
+                status_code=400, detail="Webhook event id was reused with a different payload"
+            )
         return False
     db.add(
         ExternalWebhookReceipt(
@@ -138,7 +155,9 @@ def _reserve_webhook_receipt(
         )
         if existing is not None and existing.payload_sha256 == digest:
             return False
-        raise HTTPException(status_code=409, detail="Webhook delivery conflicted with another request")
+        raise HTTPException(
+            status_code=409, detail="Webhook delivery conflicted with another request"
+        )
     return True
 
 
@@ -168,7 +187,11 @@ def _stripe_post(path: str, form: dict[str, str]) -> dict:
     except ValueError:
         body = {"error": {"message": response.text[:500]}}
     if not 200 <= response.status_code < 300:
-        message = body.get("error", {}).get("message", "Billing provider rejected request") if isinstance(body, dict) else "Billing provider rejected request"
+        message = (
+            body.get("error", {}).get("message", "Billing provider rejected request")
+            if isinstance(body, dict)
+            else "Billing provider rejected request"
+        )
         raise HTTPException(status_code=502, detail=message)
     return body
 
@@ -203,7 +226,9 @@ def commercial_status(
         "usage_period": current_period_key(),
         "usage": {row.metric: row.quantity for row in usage_rows},
         "billing_configured": bool(settings.BILLING_STRIPE_SECRET_REF),
-        "shopify_oauth_configured": bool(settings.SHOPIFY_CLIENT_ID and settings.SHOPIFY_CLIENT_SECRET),
+        "shopify_oauth_configured": bool(
+            settings.SHOPIFY_CLIENT_ID and settings.SHOPIFY_CLIENT_SECRET
+        ),
     }
 
 
@@ -215,12 +240,18 @@ def create_checkout(
     user: User = Depends(get_current_user),
 ):
     organization = get_active_organization(org_id, user.id, db)
-    require_org_roles(org_id, user.id, db, {MemberRole.OWNER}, detail="Owner permission required for billing")
+    require_org_roles(
+        org_id, user.id, db, {MemberRole.OWNER}, detail="Owner permission required for billing"
+    )
     if request.plan not in {"starter", "business"}:
-        raise HTTPException(status_code=422, detail="Only Starter and Business use self-serve checkout")
+        raise HTTPException(
+            status_code=422, detail="Only Starter and Business use self-serve checkout"
+        )
     price_id = settings.stripe_price_for_plan(request.plan)
     if not price_id:
-        raise HTTPException(status_code=503, detail=f"Stripe price is not configured for {request.plan}")
+        raise HTTPException(
+            status_code=503, detail=f"Stripe price is not configured for {request.plan}"
+        )
     billing = get_or_create_billing_account(db, organization)
     form = {
         "mode": "subscription",
@@ -237,7 +268,16 @@ def create_checkout(
     else:
         form["customer_email"] = user.email
     body = _stripe_post("/v1/checkout/sessions", form)
-    db.add(AuditLogEntry(organization_id=org_id, workflow_execution_id=None, event_type="billing.checkout_created", actor_type="human", actor_id=str(user.id), payload={"plan": request.plan, "checkout_session_id": body.get("id")}))
+    db.add(
+        AuditLogEntry(
+            organization_id=org_id,
+            workflow_execution_id=None,
+            event_type="billing.checkout_created",
+            actor_type="human",
+            actor_id=str(user.id),
+            payload={"plan": request.plan, "checkout_session_id": body.get("id")},
+        )
+    )
     db.commit()
     return {"checkout_url": body.get("url"), "session_id": body.get("id")}
 
@@ -249,11 +289,18 @@ def create_portal(
     user: User = Depends(get_current_user),
 ):
     organization = get_active_organization(org_id, user.id, db)
-    require_org_roles(org_id, user.id, db, {MemberRole.OWNER}, detail="Owner permission required for billing")
+    require_org_roles(
+        org_id, user.id, db, {MemberRole.OWNER}, detail="Owner permission required for billing"
+    )
     billing = get_or_create_billing_account(db, organization)
     if not billing.customer_id:
-        raise HTTPException(status_code=409, detail="No Stripe billing customer exists for this workspace")
-    body = _stripe_post("/v1/billing_portal/sessions", {"customer": billing.customer_id, "return_url": settings.PUBLIC_APP_URL})
+        raise HTTPException(
+            status_code=409, detail="No Stripe billing customer exists for this workspace"
+        )
+    body = _stripe_post(
+        "/v1/billing_portal/sessions",
+        {"customer": billing.customer_id, "return_url": settings.PUBLIC_APP_URL},
+    )
     return {"url": body.get("url")}
 
 
@@ -265,12 +312,20 @@ def shopify_install_url(
     user: User = Depends(get_current_user),
 ):
     get_active_organization(org_id, user.id, db)
-    require_org_roles(org_id, user.id, db, {MemberRole.OWNER, MemberRole.ADMIN}, detail="Admin permission required")
+    require_org_roles(
+        org_id,
+        user.id,
+        db,
+        {MemberRole.OWNER, MemberRole.ADMIN},
+        detail="Admin permission required",
+    )
     shop = shop.strip().lower().removeprefix("https://").removeprefix("http://").rstrip("/")
     if not shop.endswith(".myshopify.com"):
         raise HTTPException(status_code=422, detail="Shop must be a .myshopify.com domain")
     if not settings.SHOPIFY_CLIENT_ID or not settings.SHOPIFY_CLIENT_SECRET:
-        raise HTTPException(status_code=503, detail="Shopify OAuth app credentials are not configured")
+        raise HTTPException(
+            status_code=503, detail="Shopify OAuth app credentials are not configured"
+        )
     nonce = secrets.token_urlsafe(32)
     expires_at = datetime.now(UTC) + timedelta(minutes=10)
     db.add(
@@ -284,15 +339,29 @@ def shopify_install_url(
         )
     )
     db.commit()
-    state = _sign_state({"org_id": str(org_id), "shop": shop, "nonce": nonce, "exp": int(expires_at.timestamp())})
-    query = urlencode({"client_id": settings.SHOPIFY_CLIENT_ID, "scope": settings.SHOPIFY_SCOPES, "redirect_uri": settings.SHOPIFY_OAUTH_REDIRECT_URI, "state": state})
-    return {"authorization_url": f"https://{shop}/admin/oauth/authorize?{query}", "expires_in_seconds": 600}
+    state = _sign_state(
+        {"org_id": str(org_id), "shop": shop, "nonce": nonce, "exp": int(expires_at.timestamp())}
+    )
+    query = urlencode(
+        {
+            "client_id": settings.SHOPIFY_CLIENT_ID,
+            "scope": settings.SHOPIFY_SCOPES,
+            "redirect_uri": settings.SHOPIFY_OAUTH_REDIRECT_URI,
+            "state": state,
+        }
+    )
+    return {
+        "authorization_url": f"https://{shop}/admin/oauth/authorize?{query}",
+        "expires_in_seconds": 600,
+    }
 
 
 @router.get("/shopify/callback")
 def shopify_callback(code: str, state: str, shop: str, db: Session = Depends(get_db)):
     payload = _verify_state(state)
-    normalized_shop = shop.strip().lower().removeprefix("https://").removeprefix("http://").rstrip("/")
+    normalized_shop = (
+        shop.strip().lower().removeprefix("https://").removeprefix("http://").rstrip("/")
+    )
     if payload.get("shop") != normalized_shop:
         raise HTTPException(status_code=400, detail="Shop does not match OAuth state")
     _consume_oauth_nonce(db, payload, provider="shopify", subject=normalized_shop)
@@ -304,13 +373,23 @@ def shopify_callback(code: str, state: str, shop: str, db: Session = Depends(get
     if organization is None or not organization.is_active:
         raise HTTPException(status_code=404, detail="Workspace not found")
     if not settings.OAUTH_SECRET_SINK_URL:
-        raise HTTPException(status_code=503, detail="OAuth token vault sink is not configured; refusing to exchange and persist merchant credentials")
+        raise HTTPException(
+            status_code=503,
+            detail="OAuth token vault sink is not configured; refusing to exchange and persist merchant credentials",
+        )
     validate_live_endpoint(settings.OAUTH_SECRET_SINK_URL)
     token_url = f"https://{normalized_shop}/admin/oauth/access_token"
     validate_live_endpoint(token_url)
     try:
         with httpx.Client(timeout=15, follow_redirects=False) as client:
-            token_response = client.post(token_url, json={"client_id": settings.SHOPIFY_CLIENT_ID, "client_secret": settings.SHOPIFY_CLIENT_SECRET, "code": code})
+            token_response = client.post(
+                token_url,
+                json={
+                    "client_id": settings.SHOPIFY_CLIENT_ID,
+                    "client_secret": settings.SHOPIFY_CLIENT_SECRET,
+                    "code": code,
+                },
+            )
             token_response.raise_for_status()
             token_body = token_response.json()
             access_token = token_body.get("access_token")
@@ -319,21 +398,59 @@ def shopify_callback(code: str, state: str, shop: str, db: Session = Depends(get
             credential_ref = f"SHOPIFY_ORG_{str(org_id).replace('-', '').upper()}"
             sink_headers = {"Content-Type": "application/json"}
             if settings.OAUTH_SECRET_SINK_AUTH_REF:
-                sink_secret = os.getenv(f"THRESHOLD_INTEGRATION_SECRET__{settings.OAUTH_SECRET_SINK_AUTH_REF.upper()}")
+                sink_secret = os.getenv(
+                    f"THRESHOLD_INTEGRATION_SECRET__{settings.OAUTH_SECRET_SINK_AUTH_REF.upper()}"
+                )
                 if sink_secret:
                     sink_headers["Authorization"] = f"Bearer {sink_secret}"
-            sink_response = client.post(settings.OAUTH_SECRET_SINK_URL, headers=sink_headers, json={"reference": credential_ref, "secret": access_token, "metadata": {"provider": "shopify", "shop": normalized_shop, "organization_id": str(org_id)}})
+            sink_response = client.post(
+                settings.OAUTH_SECRET_SINK_URL,
+                headers=sink_headers,
+                json={
+                    "reference": credential_ref,
+                    "secret": access_token,
+                    "metadata": {
+                        "provider": "shopify",
+                        "shop": normalized_shop,
+                        "organization_id": str(org_id),
+                    },
+                },
+            )
             sink_response.raise_for_status()
     except Exception as exc:
-        raise HTTPException(status_code=502, detail="Shopify OAuth credential exchange/vault handoff failed") from exc
-    integration = db.scalar(select(IntegrationConfig).where(IntegrationConfig.organization_id == org_id, IntegrationConfig.provider == IntegrationProvider.SHOPIFY))
+        raise HTTPException(
+            status_code=502, detail="Shopify OAuth credential exchange/vault handoff failed"
+        ) from exc
+    integration = db.scalar(
+        select(IntegrationConfig).where(
+            IntegrationConfig.organization_id == org_id,
+            IntegrationConfig.provider == IntegrationProvider.SHOPIFY,
+        )
+    )
     if integration is None:
-        integration = IntegrationConfig(organization_id=org_id, provider=IntegrationProvider.SHOPIFY, config={})
+        integration = IntegrationConfig(
+            organization_id=org_id, provider=IntegrationProvider.SHOPIFY, config={}
+        )
         db.add(integration)
-    integration.config = {**(integration.config or {}), "shop_domain": normalized_shop, "api_version": settings.SHOPIFY_API_VERSION, "oauth_managed": True, "refund_enabled": False}
+    integration.config = {
+        **(integration.config or {}),
+        "shop_domain": normalized_shop,
+        "api_version": settings.SHOPIFY_API_VERSION,
+        "oauth_managed": True,
+        "refund_enabled": False,
+    }
     integration.credential_ref = credential_ref
     integration.is_enabled = True
-    db.add(AuditLogEntry(organization_id=org_id, workflow_execution_id=None, event_type="shopify.oauth_connected", actor_type="system", actor_id=None, payload={"shop": normalized_shop, "credential_ref": credential_ref}))
+    db.add(
+        AuditLogEntry(
+            organization_id=org_id,
+            workflow_execution_id=None,
+            event_type="shopify.oauth_connected",
+            actor_type="system",
+            actor_id=None,
+            payload={"shop": normalized_shop, "credential_ref": credential_ref},
+        )
+    )
     db.commit()
     return {"status": "connected", "organization_id": str(org_id), "shop": normalized_shop}
 
@@ -348,7 +465,9 @@ def _stripe_webhook_secret() -> str:
     return value
 
 
-def _verify_stripe_signature(raw_body: bytes, signature_header: str, tolerance_seconds: int = 300) -> None:
+def _verify_stripe_signature(
+    raw_body: bytes, signature_header: str, tolerance_seconds: int = 300
+) -> None:
     parts: dict[str, list[str]] = {}
     for item in signature_header.split(","):
         if "=" not in item:
@@ -364,7 +483,9 @@ def _verify_stripe_signature(raw_body: bytes, signature_header: str, tolerance_s
     if abs(now - timestamp) > tolerance_seconds:
         raise HTTPException(status_code=400, detail="Expired Stripe webhook signature")
     signed_payload = str(timestamp).encode() + b"." + raw_body
-    expected = hmac.new(_stripe_webhook_secret().encode(), signed_payload, hashlib.sha256).hexdigest()
+    expected = hmac.new(
+        _stripe_webhook_secret().encode(), signed_payload, hashlib.sha256
+    ).hexdigest()
     if not any(hmac.compare_digest(expected, candidate) for candidate in signatures):
         raise HTTPException(status_code=400, detail="Invalid Stripe webhook signature")
 
@@ -413,9 +534,23 @@ async def stripe_billing_webhook(request: Request, db: Session = Depends(get_db)
             return {"received": True, "ignored": "unknown_workspace"}
         billing = get_or_create_billing_account(db, organization)
         billing.customer_id = str(customer_id) if customer_id else billing.customer_id
-        billing.subscription_id = str(subscription_id) if subscription_id else billing.subscription_id
+        billing.subscription_id = (
+            str(subscription_id) if subscription_id else billing.subscription_id
+        )
         billing.subscription_status = "active"
-        db.add(AuditLogEntry(organization_id=organization.id, workflow_execution_id=None, event_type="billing.checkout_completed", actor_type="system", actor_id=None, payload={"stripe_event_id": event.get("id"), "subscription_id": billing.subscription_id}))
+        db.add(
+            AuditLogEntry(
+                organization_id=organization.id,
+                workflow_execution_id=None,
+                event_type="billing.checkout_completed",
+                actor_type="system",
+                actor_id=None,
+                payload={
+                    "stripe_event_id": event.get("id"),
+                    "subscription_id": billing.subscription_id,
+                },
+            )
+        )
         db.commit()
         return {"received": True}
 
@@ -430,7 +565,7 @@ async def stripe_billing_webhook(request: Request, db: Session = Depends(get_db)
             return {"received": True, "ignored": "unknown_workspace"}
         billing = get_or_create_billing_account(db, organization)
         subscription = obj
-        first_item = (((obj.get("items") or {}).get("data") or [{}])[0])
+        first_item = ((obj.get("items") or {}).get("data") or [{}])[0]
         price = first_item.get("price") or {}
         price_id = price.get("id")
         resolved_plan = _plan_from_price(price_id)
@@ -440,12 +575,28 @@ async def stripe_billing_webhook(request: Request, db: Session = Depends(get_db)
         billing.price_id = price_id
         billing.cancel_at_period_end = bool(obj.get("cancel_at_period_end", False))
         period_end = obj.get("current_period_end")
-        billing.current_period_end = datetime.fromtimestamp(period_end, tz=UTC) if period_end else None
+        billing.current_period_end = (
+            datetime.fromtimestamp(period_end, tz=UTC) if period_end else None
+        )
         if event_type == "customer.subscription.deleted":
             organization.plan = "trial"
         elif resolved_plan:
             organization.plan = resolved_plan
-        db.add(AuditLogEntry(organization_id=organization.id, workflow_execution_id=None, event_type="billing.subscription_synced", actor_type="system", actor_id=None, payload={"stripe_event_id": event.get("id"), "status": billing.subscription_status, "price_id": price_id, "plan": organization.plan}))
+        db.add(
+            AuditLogEntry(
+                organization_id=organization.id,
+                workflow_execution_id=None,
+                event_type="billing.subscription_synced",
+                actor_type="system",
+                actor_id=None,
+                payload={
+                    "stripe_event_id": event.get("id"),
+                    "status": billing.subscription_status,
+                    "price_id": price_id,
+                    "plan": organization.plan,
+                },
+            )
+        )
         db.commit()
         return {"received": True}
 
