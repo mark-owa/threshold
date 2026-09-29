@@ -896,7 +896,6 @@ class WorkflowEngine:
                 select(IntegrationConfig).where(
                     IntegrationConfig.organization_id == execution.organization_id,
                     IntegrationConfig.provider == IntegrationProvider.MOCK_PAYMENTS,
-                    IntegrationConfig.is_enabled.is_(True),
                 )
             )
             if integration is None:
@@ -908,6 +907,8 @@ class WorkflowEngine:
                 )
                 self.db.add(integration)
                 self.db.flush()
+            elif not integration.is_enabled:
+                raise ValueError("Integration is disabled")
             return integration
 
         candidates = self.db.scalars(
