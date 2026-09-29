@@ -65,7 +65,15 @@ jobs:
 
       - name: Run tests
         working-directory: backend
-        run: pytest --cov=app --cov-report=term-missing --cov-fail-under=70
+        run: >-
+          pytest
+          tests
+          ../m8_tests/test_oauth_vault_runtime.py
+          ../m8_tests/test_saas_milestone2.py
+          ../m8_tests/test_shopify_expiring_tokens.py
+          --cov=app
+          --cov-report=term-missing
+          --cov-fail-under=70
 
       - name: Audit Python dependencies
         working-directory: backend
