@@ -30,7 +30,7 @@ from app.models.enums import (
     RequestCategory,
 )
 
-EXPECTED_SCHEMA_REVISION = "d7a9b123e5f7"
+EXPECTED_SCHEMA_REVISION = "e8b0c234f6a8"
 
 ReadinessLevel = Literal["pass", "warn", "block"]
 
