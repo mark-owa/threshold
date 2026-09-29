@@ -391,12 +391,15 @@ class ShopifyRefundProvider(RefundProvider):
         client = self._client(integration)
         mutation = """
         mutation ThresholdRefund($input: RefundInput!) {
-          refundCreate(input: $input) @idempotent(key: \"%s\") {
+          refundCreate(input: $input) @idempotent(key: \"__THRESHOLD_IDEMPOTENCY_KEY__\") {
             refund { id totalRefundedSet { shopMoney { amount currencyCode } } }
             userErrors { field message }
           }
         }
-        """ % idempotency_key.replace('"', "")
+        """.replace(
+            "__THRESHOLD_IDEMPOTENCY_KEY__",
+            idempotency_key.replace('"', ""),
+        )
         variables = {
             "input": {
                 "orderId": external_order_id,
