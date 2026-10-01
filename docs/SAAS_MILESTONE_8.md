@@ -102,11 +102,9 @@ and test these paths before relying on the staging report's manual-retry boundar
 ## Development versus production containers
 
 `backend/Dockerfile` installs runtime dependencies and uses a non-root user.
-`backend/Dockerfile.dev` also exists and installs development dependencies, but
-the current `docker-compose.yml` uses the default `backend/Dockerfile`; it does
-not select the development image. Follow [TESTING](TESTING.md) to install test/lint
-tools in a disposable local container before using the Make targets.
+`backend/Dockerfile.dev` installs development dependencies and is selected by
+the current local `docker-compose.yml` for backend, worker, and beat. Follow
+[TESTING](TESTING.md) for the Make targets.
 
 `docker-compose.prod.yml` uses the runtime image with its production runtime
-restrictions. The presence of a development Dockerfile alone does not make
-`make test` work in a container that lacks development dependencies.
+restrictions; test tooling stays in the development image.

@@ -1,0 +1,217 @@
+{
+  "name": "Threshold \u2014 02_sync_outcome_to_hubspot",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "threshold-refund-outcome",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "0d34f8a7-fed4-541e-90f7-600d78aa6c39",
+      "name": "Receive Outcome",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "ea0fb505-faa9-40f5-8beb-fda36e897e53"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst raw = (await this.helpers.getBinaryDataBuffer(0, 'data')).toString('utf8');\nif (Buffer.byteLength(raw, 'utf8') > 16384) throw new Error('Outcome too large');\nconst timestamp = item.json.headers['x-threshold-timestamp'];\nif (!/^[0-9]+$/.test(timestamp || '') || Math.abs(Date.now()/1000 - Number(timestamp)) > 300) throw new Error('Expired outcome');\nreturn [{json:{payload:JSON.parse(raw), signed_text:timestamp + '.' + raw,\n supplied_signature:item.json.headers['x-threshold-signature'],\n header_delivery_id:item.json.headers['x-threshold-delivery-id']}}];"
+      },
+      "id": "aee97cd2-02eb-55af-90f0-2254de1f1cd1",
+      "name": "Read Signed Outcome",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.signed_text }}",
+        "dataPropertyName": "expected_signature",
+        "encoding": "hex",
+        "binaryData": false
+      },
+      "id": "540506d3-7853-5cad-8068-44e2be084da2",
+      "name": "Calculate Outcome Signature",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Configure for ONE Threshold organization and ONE HubSpot account.\nconst config = {\n  organization_id: 'REPLACE_WITH_THRESHOLD_ORG_UUID',\n  portal_id: 'REPLACE_WITH_HUBSPOT_PORTAL_ID',\n  completed_stage_id: 'REPLACE_WITH_RESOLVED_STAGE_ID',\n  cancelled_stage_id: 'REPLACE_WITH_REJECTED_STAGE_ID'\n};\nconst p = $json.payload;\nconst supplied = String($json.supplied_signature || '').replace(/^sha256=/,'');\nconst expected = String($json.expected_signature || '');\nif (!/^[a-f0-9]{64}$/.test(supplied) || !/^[a-f0-9]{64}$/.test(expected)) throw new Error('Invalid signature');\nlet diff = 0;\nfor (let i=0; i<64; i++) diff |= supplied.charCodeAt(i) ^ expected.charCodeAt(i);\nif (diff !== 0) throw new Error('Invalid signature');\nif (!p || p.schema_version !== 1 || p.type !== 'threshold.refund.final') throw new Error('Unsupported outcome');\nif (p.organization_id !== config.organization_id || p.crm?.portal_id !== config.portal_id || p.crm?.provider !== 'hubspot') throw new Error('Organization or CRM account mismatch');\nif (!/^[0-9]{1,32}$/.test(p.crm.ticket_id || '')) throw new Error('Invalid ticket ID');\nif (!['completed','cancelled'].includes(p.status) || (p.status === 'completed' && p.verified !== true)) throw new Error('Outcome not final or verified');\nif (typeof p.delivery_id !== 'string' || p.delivery_id !== $json.header_delivery_id) throw new Error('Delivery ID mismatch');\nconst stage = p.status === 'completed' ? config.completed_stage_id : config.cancelled_stage_id;\nif (!/^[0-9]+$/.test(stage)) throw new Error('Configure the HubSpot internal stage IDs');\nreturn [{json:{delivery_id:p.delivery_id, ticket_id:p.crm.ticket_id,\n properties:{hs_pipeline_stage:stage}}}];"
+      },
+      "id": "b5d49acb-4fea-5b80-9b07-0a7f66fceb0b",
+      "name": "Validate and Map Outcome",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://api.hubapi.com/crm/v3/objects/tickets/' + $json.ticket_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { properties: $json.properties } }}",
+        "options": {
+          "timeout": 5000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "d96b9bee-adb4-5e4a-aa7f-4bcefcbbdf46",
+      "name": "Update Existing HubSpot Ticket",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const expected = $('Validate and Map Outcome').first().json;\nconst status = Number($json.statusCode);\nconst good = status === 200 && String($json.body?.id) === expected.ticket_id;\n// Never acknowledge an update to the wrong record or a generic green execution.\nreturn [{json:{response_code:good ? 200 : (status === 200 ? 502 : status),\n retry_after:String($json.headers?.['retry-after'] || '0'),\n response:good ? {ok:true, delivery_id:expected.delivery_id} : {ok:false, code:'CRM_SYNC_FAILED'}}}];"
+      },
+      "id": "cc47cb56-aff6-5c5d-8aeb-97030ec04839",
+      "name": "Build Delivery Acknowledgment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.response }}",
+        "options": {
+          "responseCode": "={{ $json.response_code }}",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Retry-After",
+                "value": "={{ $json.retry_after }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "ade303dd-aa85-5966-a012-19d450b1b7b5",
+      "name": "Acknowledge After CRM Update",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1320,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Receive Outcome": {
+      "main": [
+        [
+          {
+            "node": "Read Signed Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Signed Outcome": {
+      "main": [
+        [
+          {
+            "node": "Calculate Outcome Signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Outcome Signature": {
+      "main": [
+        [
+          {
+            "node": "Validate and Map Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate and Map Outcome": {
+      "main": [
+        [
+          {
+            "node": "Update Existing HubSpot Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Existing HubSpot Ticket": {
+      "main": [
+        [
+          {
+            "node": "Build Delivery Acknowledgment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Delivery Acknowledgment": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge After CRM Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
+  },
+  "pinData": {}
+}

@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, Float, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import JSONB
@@ -8,6 +9,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base_class import Base
 from app.models.base import GUID, TimestampMixin, UUIDPKMixin, enum_column
 from app.models.enums import ApprovalStatus, RiskLevel
+
+if TYPE_CHECKING:
+    from app.models.organization import User
+    from app.models.workflow import WorkflowExecution
 
 
 class ApprovalRequest(Base, UUIDPKMixin, TimestampMixin):

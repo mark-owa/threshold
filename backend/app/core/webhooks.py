@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import os
 import time
 
@@ -10,6 +11,13 @@ def webhook_secret_value(reference: str | None) -> str | None:
     if not reference:
         return None
     return os.getenv(f"THRESHOLD_WEBHOOK_SECRET__{reference.upper()}")
+
+
+def canonical_payload(payload: dict) -> str:
+    # Key ordering/whitespace are irrelevant; JSON types remain significant.
+    return json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+    )
 
 
 def compute_signature(secret: str, timestamp: str, body: bytes) -> str:

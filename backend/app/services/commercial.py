@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models import BillingAccount, Organization, UsageCounter
 
-PLAN_CATALOG = {
+PLAN_CATALOG: dict[str, dict] = {
     "trial": {
         "name": "Trial",
         "monthly_price_usd": 0,

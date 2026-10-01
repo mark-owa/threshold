@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import select
 
@@ -21,6 +21,7 @@ from app.models.enums import (
     WorkflowStatus,
 )
 from app.services.outbox import enqueue_outbox, recover_stale_outbox
+from app.services.outcomes import TOPIC, DeliveryError, deliver_outcome
 from app.workers.celery_app import celery_app
 from app.workflows.engine import WorkflowEngine
 
@@ -146,6 +147,9 @@ def execute_action(self, action_id: str, organization_id: str) -> str:
 
 def _publish_message(row: OutboxMessage) -> None:
     payload = row.payload or {}
+    if row.topic == TOPIC:
+        deliver_outcome(row)
+        return
     if row.topic == "process_incoming_event":
         celery_app.send_task(
             "threshold.process_persisted_event",
@@ -169,13 +173,15 @@ def _publish_message(row: OutboxMessage) -> None:
 
 @celery_app.task(name="threshold.dispatch_outbox", bind=True)
 def dispatch_outbox(self, limit: int | None = None) -> int:
-    """Publish committed outbox rows to Celery with stale-lease recovery.
+    """Publish committed tasks or deliver n8n outcomes with stale-lease recovery.
 
     A crash after publish but before SENT is deliberately safe: the message may
     be published twice, and both consumers are idempotent.
     """
     batch_size = min(limit or settings.OUTBOX_BATCH_SIZE, settings.OUTBOX_BATCH_SIZE)
-    worker_id = f"outbox:{self.request.id or 'unknown'}"
+    # Broker redelivery can reuse a Celery task ID. Each publisher invocation
+    # needs its own lease token so an old invocation cannot finish a newer lease.
+    worker_id = f"outbox:{uuid4()}"
     published = 0
     db = SessionLocal()
     try:
@@ -215,29 +221,55 @@ def dispatch_outbox(self, limit: int | None = None) -> int:
             try:
                 _publish_message(row)
             except Exception as exc:  # broker/topic failure, safe to retry publishing
-                row = db.get(OutboxMessage, message_id)
-                if row is not None:
+                row = db.scalar(
+                    select(OutboxMessage)
+                    .where(OutboxMessage.id == message_id)
+                    .with_for_update()
+                    .execution_options(populate_existing=True)
+                )
+                if (
+                    row is not None
+                    and row.status == OutboxStatus.PROCESSING
+                    and row.locked_by == worker_id
+                ):
                     row.last_error = str(exc)
                     row.locked_at = None
                     row.locked_by = None
-                    if row.attempt_count >= row.max_attempts:
+                    if row.attempt_count >= row.max_attempts or (
+                        isinstance(exc, DeliveryError) and not exc.retryable
+                    ):
                         row.status = OutboxStatus.DEAD_LETTER
                     else:
                         row.status = OutboxStatus.FAILED
-                        delay = min(300, 2 ** min(row.attempt_count, 8))
+                        delay = max(
+                            min(300, 2 ** min(row.attempt_count, 8)), getattr(exc, "retry_after", 0)
+                        )
                         row.available_at = datetime.now(UTC) + timedelta(seconds=delay)
                     db.commit()
+                else:
+                    db.rollback()
                 continue
 
-            row = db.get(OutboxMessage, message_id)
-            if row is not None:
+            row = db.scalar(
+                select(OutboxMessage)
+                .where(OutboxMessage.id == message_id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+            if (
+                row is not None
+                and row.status == OutboxStatus.PROCESSING
+                and row.locked_by == worker_id
+            ):
                 row.status = OutboxStatus.SENT
                 row.sent_at = datetime.now(UTC)
                 row.locked_at = None
                 row.locked_by = None
                 row.last_error = None
                 db.commit()
-            published += 1
+                published += 1
+            else:
+                db.rollback()
         return published
     finally:
         db.close()

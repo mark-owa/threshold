@@ -1,0 +1,10 @@
+{
+  "text": "Refund order #ORD-1002 for $65.00",
+  "sender": "ana.bootcamp@example.com",
+  "external_id": "hubspot:123:ticket:456",
+  "crm": {
+    "provider": "hubspot",
+    "portal_id": "123",
+    "ticket_id": "456"
+  }
+}

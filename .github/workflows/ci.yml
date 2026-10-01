@@ -55,6 +55,10 @@ jobs:
         working-directory: backend
         run: ruff check .
 
+      - name: Typecheck backend
+        working-directory: backend
+        run: mypy app
+
       - name: Run migrations
         working-directory: backend
         run: alembic upgrade head
@@ -92,11 +96,14 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      - name: Check n8n workflow templates
+        run: node scripts/check_n8n_templates.cjs
+
   deployment-config:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Prepare production Compose environment
-        run: cp .env.example .env
       - name: Validate production Compose syntax
-        run: docker compose -f docker-compose.prod.yml config --quiet
+        run: |
+          cp .env.example .env
+          docker compose -f docker-compose.prod.yml config --quiet

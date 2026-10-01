@@ -108,7 +108,9 @@ def test_readiness_check_and_configuration_branches():
     stale = {
         row.key: row
         for row in configuration_checks(
-            _settings(BETA_LAST_RESTORE_DRILL_AT=(datetime.now(UTC) - timedelta(days=365)).isoformat())
+            _settings(
+                BETA_LAST_RESTORE_DRILL_AT=(datetime.now(UTC) - timedelta(days=365)).isoformat()
+            )
         )
     }
     assert stale["restore_drill"].level == "block"

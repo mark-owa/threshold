@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -38,6 +39,10 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: str = "http://localhost:5173"
     INTEGRATION_ALLOWED_HOSTS: str = ""
+    # Trusted operator configuration, keyed by Threshold organization UUID.
+    # Each target: url, secret_ref, hubspot_portal_id. No secrets in this JSON.
+    N8N_OUTCOME_TARGETS: dict[str, dict[str, str]] = Field(default_factory=dict)
+
     OUTBOX_LEASE_SECONDS: int = 60
     OUTBOX_BATCH_SIZE: int = 100
     EVENT_PROCESSING_LEASE_SECONDS: int = 300

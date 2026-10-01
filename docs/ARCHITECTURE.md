@@ -94,7 +94,8 @@ retry; test and consolidate those paths before live use.
 | `backend/app/services/outbox.py` | Outbox records and stale publication leases |
 | `backend/app/workers/tasks.py` | Delivery, action tasks, dispatch, and recovery |
 | `backend/app/integrations/` | Provider adapters and Shopify order integration |
-| `frontend/src/` | Application shell, API/types, workspace data/actions, and view components |
+| `backend/app/services/outcomes.py` | Final refund outcome creation and signed n8n delivery |
+| `frontend/src/` | Routed pages, typed API client, organization-scoped queries, layouts, and domain components |
 
 There are no committed `steps.py` or `refund_rules.py` modules. Orchestration
 remains concentrated in `engine.py`.
@@ -106,9 +107,27 @@ live in PostgreSQL. Event keys are organization-scoped; action keys include the
 organization, order, and canonical two-decimal amount. These keys are not a complete
 payment ledger or an external-provider transaction.
 
-The frontend stores its bearer token in memory. nginx proxies Docker dashboard API
+The frontend stores its bearer token in per-tab `sessionStorage`. nginx proxies Docker dashboard API
 requests. `deploy/m8/` separately packages a frozen runtime archive with compatibility
 overlays; current CI checks canonical source and does not build that image.
 
 See [RELIABILITY](RELIABILITY.md), [SECURITY](SECURITY.md), and
 [VERIFICATION](VERIFICATION.md) for operational behavior and proof limits.
+
+## Optional n8n/HubSpot bridge
+
+Signed CRM intake binds the event ID, organization endpoint, and HubSpot portal
+before persistence. Exact duplicates reuse the event; conflicting JSON for the
+same event ID returns 409. Ordinary webhooks without CRM correlation remain supported.
+
+Verified completion and cancellation insert a deterministic final-outcome row
+in the same transaction as the execution state. The dispatcher signs the callback
+and requires an acknowledgment containing the same delivery ID. Retryable failures
+use bounded attempts and numeric Retry-After; permanent failures enter dead-letter.
+Fresh lease tokens and ownership checks prevent stale dispatchers from completing
+another attempt's lease.
+
+The inactive receiver template updates one existing HubSpot ticket. It does not
+execute refunds, create tickets, send messages, or provide a durable receiver inbox.
+Delivery is at least once. See [N8N_INTEGRATION](N8N_INTEGRATION.md) for configuration
+and [N8N_VERIFICATION](N8N_VERIFICATION.md) for test scope.

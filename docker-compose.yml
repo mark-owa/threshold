@@ -23,7 +23,9 @@ services:
       retries: 10
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
     env_file: .env
     ports:
       - "8000:8000"
@@ -37,7 +39,9 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   worker:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
     env_file: .env
     volumes:
       - ./backend:/app
@@ -49,7 +53,9 @@ services:
     command: celery -A app.workers.celery_app worker --loglevel=info
 
   beat:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
     env_file: .env
     volumes:
       - ./backend:/app
@@ -61,7 +67,11 @@ services:
     command: celery -A app.workers.celery_app beat --loglevel=info
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        # Local demo only: shows the seeded demo credentials on the sign-in screen.
+        VITE_SHOW_DEMO_CREDENTIALS: "true"
     ports:
       - "5173:80"
     depends_on:

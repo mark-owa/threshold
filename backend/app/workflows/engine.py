@@ -263,11 +263,14 @@ class WorkflowEngine:
         return execution
 
     def _sync_event_status(self, execution: WorkflowExecution) -> None:
+        from app.services.outcomes import enqueue_final_outcome
+
+        enqueue_final_outcome(self.db, execution)
         event = self.db.get(IncomingEvent, execution.incoming_event_id)
         if event is None:
             return
         event.processing_started_at = None
-        if execution.status == WorkflowStatus.COMPLETED:
+        if execution.status in {WorkflowStatus.COMPLETED, WorkflowStatus.CANCELLED}:
             event.processing_status = EventProcessingStatus.COMPLETED
             event.completed_at = execution.completed_at or datetime.now(UTC)
             event.last_error = None
@@ -304,6 +307,7 @@ class WorkflowEngine:
                 "human",
                 {"approval_id": str(approval.id), "reviewer_id": str(reviewer_id)},
             )
+            self._sync_event_status(execution)
             self.db.commit()
             return execution
 
@@ -395,6 +399,7 @@ class WorkflowEngine:
                 "system",
                 {"action_id": action_result.get("action_id"), "via_approval": str(approval.id)},
             )
+            self._sync_event_status(execution)
             self.db.commit()
             self.db.refresh(execution)
             return execution
@@ -731,12 +736,15 @@ class WorkflowEngine:
         UNKNOWN provider outcomes are intentionally excluded. They must be
         reconciled first so a transport timeout cannot cause a duplicate refund.
         """
-        execution = self.db.scalar(
+        locked_execution = self.db.scalar(
             select(WorkflowExecution)
             .where(WorkflowExecution.id == execution.id)
             .with_for_update()
             .execution_options(populate_existing=True)
         )
+        if locked_execution is None:
+            raise ValueError("Execution not found")
+        execution = locked_execution
         if execution.status != WorkflowStatus.FAILED:
             raise ValueError("Only failed executions can be retried")
         action = self.db.scalar(
@@ -815,20 +823,22 @@ class WorkflowEngine:
             execution.status = WorkflowStatus.FAILED
             execution.completed_at = datetime.now(UTC)
             execution.error = action.error or "provider_action_failed"
+        self._sync_event_status(execution)
         self.db.commit()
         self.db.refresh(execution)
         return execution
 
     def reconcile_action(self, action: ActionExecution) -> ActionExecution:
         """Ask the provider what happened without issuing the side effect again."""
-        action = self.db.scalar(
+        locked_action = self.db.scalar(
             select(ActionExecution)
             .where(ActionExecution.id == action.id)
             .with_for_update()
             .execution_options(populate_existing=True)
         )
-        if action is None:
+        if locked_action is None:
             raise ValueError("Action not found")
+        action = locked_action
         integration = self.db.get(IntegrationConfig, action.integration_config_id)
         if integration is None or not integration.is_enabled:
             raise ValueError("Integration is disabled or missing")
@@ -1119,9 +1129,10 @@ class WorkflowEngine:
         if action is None:
             raise ValueError("Action disappeared after provider execution")
         integration = self.db.get(IntegrationConfig, action.integration_config_id)
-        attempt = self.db.get(ActionAttempt, attempt.id)
-        if integration is None or attempt is None:
+        persisted_attempt = self.db.get(ActionAttempt, attempt.id)
+        if integration is None or persisted_attempt is None:
             raise ValueError("Action execution state is incomplete")
+        attempt = persisted_attempt
 
         attempt.provider_operation_id = result.provider_operation_id
         attempt.response_payload = result.response
@@ -1244,7 +1255,8 @@ class WorkflowEngine:
         )
         if order is None or amount_decimal > refundable:
             raise ValueError(
-                "Refund requires an existing order and cannot exceed its remaining refundable amount"
+                "Refund requires an existing order and cannot exceed its "
+                "remaining refundable amount"
             )
         idem = f"refund:{execution.organization_id}:{order_number}:{amount_decimal:.2f}"
         existing = self.db.scalar(

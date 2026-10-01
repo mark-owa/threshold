@@ -9,11 +9,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.webhooks import verify_signature, webhook_secret_value
+from app.core.webhooks import canonical_payload, verify_signature, webhook_secret_value
 from app.db.session import get_db
 from app.models import AuditLogEntry, IncomingEvent, IntegrationConfig, WebhookEndpoint
 from app.models.enums import EventProcessingStatus, EventSource, IntegrationProvider
 from app.services.outbox import enqueue_outbox
+from app.workflows.primitives import normalize_crm
 
 router = APIRouter(prefix=f"{get_settings().API_V1_PREFIX}/webhooks", tags=["webhooks"])
 
@@ -60,6 +61,24 @@ async def receive_webhook(
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="Webhook JSON payload must be an object")
 
+    if not x_threshold_event_id.strip() or len(x_threshold_event_id) > 255:
+        raise HTTPException(status_code=422, detail="EVENT_ID_INVALID")
+    try:
+        canonical_payload(payload)
+        if "crm" in payload:
+            crm = normalize_crm(payload["crm"])
+            expected_id = f"hubspot:{crm['portal_id']}:ticket:{crm['ticket_id']}"
+            if (
+                payload.get("external_id") != x_threshold_event_id
+                or x_threshold_event_id != expected_id
+            ):
+                raise ValueError("CRM event ID must match the signed external_id and ticket")
+            target = get_settings().N8N_OUTCOME_TARGETS.get(str(endpoint.organization_id))
+            if not target or crm["portal_id"] != target.get("hubspot_portal_id"):
+                raise ValueError("CRM portal is not configured for this organization")
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     idempotency_key = f"webhook:{endpoint.id}:{x_threshold_event_id}"
     existing = db.scalar(
         select(IncomingEvent).where(
@@ -68,6 +87,8 @@ async def receive_webhook(
         )
     )
     if existing is not None:
+        if canonical_payload(existing.raw_payload) != canonical_payload(payload):
+            raise HTTPException(status_code=409, detail="EVENT_ID_CONFLICT")
         db.commit()
         return JSONResponse(
             status_code=status.HTTP_202_ACCEPTED,

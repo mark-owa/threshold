@@ -74,3 +74,17 @@ runtime plus build overlays and can differ from canonical source. See
 
 Before live use, test timeout-after-provider-commit, duplicate delivery, worker loss,
 outbox failure, and reconciliation together against disposable test infrastructure.
+
+## Final CRM outcomes
+
+The optional bridge uses deterministic organization/execution/status IDs to avoid
+creating duplicate outcome rows. Signed callbacks require an exact delivery-ID
+acknowledgment. HTTP 408, 429, and selected server errors are retryable; numeric
+Retry-After is bounded to an hour. Other failures can enter dead-letter. An operator
+requeues the outcome rather than executing the refund again.
+
+Local tests cover acknowledgment validation, HTTP retries, signatures, and stale
+lease handling. The template harness checks JavaScript and workflow structure.
+Neither substitutes for a real n8n/HubSpot round trip or concurrent PostgreSQL lease
+recovery. The receiver has no durable inbox, so downstream CRM automation must
+tolerate duplicate delivery.

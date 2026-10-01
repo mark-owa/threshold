@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
@@ -8,6 +9,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base_class import Base
 from app.models.base import GUID, TimestampMixin, UUIDPKMixin, enum_column
 from app.models.enums import RequestCategory, StepStatus, StepType, WorkflowStatus
+
+if TYPE_CHECKING:
+    from app.models.event import IncomingEvent
 
 
 class WorkflowDefinition(Base, UUIDPKMixin, TimestampMixin):

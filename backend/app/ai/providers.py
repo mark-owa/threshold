@@ -175,7 +175,7 @@ class AnthropicProvider:
             tool_choice={"type": "tool", "name": tool_name},
         )
         tool_use = next(
-            (block for block in response.content if getattr(block, "type", None) == "tool_use"),
+            (block for block in response.content if block.type == "tool_use"),
             None,
         )
         if tool_use is None:
