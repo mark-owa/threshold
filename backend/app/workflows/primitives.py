@@ -11,6 +11,24 @@ import re
 from app.models.enums import RequestCategory
 
 
+def normalize_crm(value: object) -> dict:
+    """Preserve only explicit CRM correlation. IDs remain strings."""
+    if not isinstance(value, dict):
+        raise ValueError("crm must be an object")
+    allowed = {"provider", "portal_id", "ticket_id", "contact_id"}
+    if set(value) - allowed or value.get("provider") != "hubspot":
+        raise ValueError("crm must identify HubSpot using supported fields")
+    for key in ("portal_id", "ticket_id"):
+        if not isinstance(value.get(key), str) or not re.fullmatch(r"[0-9]{1,32}", value[key]):
+            raise ValueError(f"crm.{key} must be a numeric ID string")
+    if "contact_id" in value and (
+        not isinstance(value["contact_id"], str)
+        or not re.fullmatch(r"[0-9]{1,32}", value["contact_id"])
+    ):
+        raise ValueError("crm.contact_id must be a numeric ID string")
+    return dict(value)
+
+
 def normalize_payload(payload: dict) -> dict:
     text = payload.get("text") or payload.get("message") or payload.get("body") or ""
     if not isinstance(text, str):
@@ -21,6 +39,7 @@ def normalize_payload(payload: dict) -> dict:
             raise ValueError(f"{key} must be a string of at most 255 characters")
     return {
         **({"simulate_failure_once": True} if payload.get("simulate_failure_once") is True else {}),
+        **({"crm": normalize_crm(payload["crm"])} if "crm" in payload else {}),
         "text": text.strip(),
         "sender": payload.get("sender"),
         "external_id": payload.get("external_id"),
@@ -50,11 +69,14 @@ def extract_refund(text: str) -> dict:
         text,
         re.I,
     )
-    result = {"order_number": order_match.group(1) if order_match else None}
+    result: dict[str, str | float | None] = {
+        "order_number": order_match.group(1) if order_match else None
+    }
     if amount_match:
-        result["amount_usd"] = float(amount_match.group(2).replace(",", ""))
+        amount = float(amount_match.group(2).replace(",", ""))
         if amount_match.group(1) == "-":
-            result["amount_usd"] = -abs(result["amount_usd"])
+            amount = -abs(amount)
+        result["amount_usd"] = amount
     return result
 
 

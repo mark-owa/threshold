@@ -2,20 +2,20 @@
 
 ## Implemented
 
-- PostgreSQL models/migrations and local Compose setup.
-- Login, current user, tenant membership, and reviewer permission checks.
-- Synchronous and queued authenticated demo ingestion.
-- Reference refund workflow with policy/risk gating, approval, mock execution,
-  verification, event/action deduplication, retries, and circuit state.
-- Four smaller classify-and-notify demo workflows.
-- Provider adapters, prompt versions, step/usage records, request logging, and metrics.
-- React operator dashboard, seed scripts, tests, and small labeled evaluations.
+- PostgreSQL models/migrations, local Compose, and CI.
+- Authentication, workspaces, memberships, roles, and invitations.
+- Refund policy/approval, mock execution, action records, retries, and reconciliation.
+- Signed webhook intake, transactional outbox, and recovery tooling.
+- Shopify/Stripe/generic REST adapters and commercial billing scaffolding.
+- Routed React dashboard with typed API calls and organization-scoped queries.
+- Optional signed n8n final-outcome bridge and inactive HubSpot templates.
+- Regression tests, deterministic evaluations, and historical demo captures.
 
-## Deferred, not represented as working features
+## Deferred or incompletely verified
 
-Signed webhooks and API-key management; refresh tokens; user/organization management;
-real payment, email, CRM, and Slack connectors; rate limiting; general workflow
-continuations; approval expiry/escalation; robust queue crash recovery; immutable
-audit storage; comprehensive live-model evaluation; recorded demo/screenshots.
+Refresh tokens, API-key issuance, general workflow continuation, approval expiry,
+immutable audit storage, current dashboard recordings, real provider/n8n round trips,
+complete interruption/restore/alert drills, and consolidation of the historical M8
+runtime with canonical source.
 
-These are scope boundaries, not requirements to expand this portfolio project.
+[VERIFICATION](VERIFICATION.md) distinguishes implemented code from observed behavior.

@@ -1,53 +1,50 @@
-# Threshold Dashboard
+# Threshold dashboard
 
-React + TypeScript + Vite operator dashboard for the Threshold API.
-
-## Local development
+React 19 + TypeScript + Vite. Talks to the FastAPI backend under `/api/v1`.
 
 ```bash
 npm ci
-npm run dev
+npm run dev        # http://localhost:5173 (set VITE_API_URL if the API is on another origin)
+npm run typecheck  # strict tsc, no emit
+npm run build      # typecheck + production build
 ```
 
-Use `VITE_API_URL=http://localhost:8000 npm run dev` when running Vite locally.
-The Docker dashboard uses the nginx same-origin proxy instead.
+## Configuration
 
-The dashboard covers: sign-in/registration/invitations, workflow metrics, the approval
-queue, execution inspection (per-step inputs, outputs, latency), external actions and
-recovery, refund policy and integration settings, team management, billing and usage,
-and the private-beta launch gate.
+| Variable | Purpose |
+| --- | --- |
+| `VITE_API_URL` | API origin. Leave empty to use same-origin (the nginx image proxies `/api`). |
+| `VITE_SHOW_DEMO_CREDENTIALS` | `true` shows a "Fill credentials" helper for the seeded demo user. On in `npm run dev` and the local `docker-compose.yml`; **off** in production builds. |
 
-The UI intentionally exposes the deterministic/AI boundary rather than presenting the system as an autonomous black box.
+## Structure
 
-## Source layout
-
-| File | Responsibility |
-|---|---|
-| `src/main.tsx` | Mounts `<App />` |
-| `src/App.tsx` | Session and navigation state; composes the views |
-| `src/types.ts` | Types for every API response and request body the dashboard uses |
-| `src/api.ts` | Authenticated `fetch` helper and `parseResponse` |
-| `src/workspaceData.ts` | Loads everything shown for one workspace into a single `WorkspaceData` object |
-| `src/workspaceActions.ts` | Every operational action (approve, retry, save settings, invite, ...) |
-| `src/nav.ts` | Tab names and titles |
-| `src/components/` | One file per view, plus `AuthScreen` and `CreateWorkspacePanel`, which own their own form state |
-
-`parseResponse` returns a discriminated union intended to require checking `ok`
-before using the response body. That protection needs a real TypeScript type-check;
-the current Vite build does not enforce it. API types are compile-time declarations,
-and responses are not validated at runtime.
-
-## Type-checking
-
-`npm run build` runs Vite, which strips types without checking them, so a type error
-does not fail the build. A `tsconfig.json` (strict mode) is included, but React 19 ships
-no type declarations, so a one-time setup is needed before `tsc` can run:
-
-```bash
-npm install --save-dev @types/react @types/react-dom
-npx tsc --noEmit
+```
+src/
+  app/         router (App.tsx) and providers
+  api/         client.ts is the only place that calls fetch; one module per API area
+  types/       API types mirroring backend responses and enums
+  hooks/       react-query reads (queries.ts) and mutations with toasts (mutations.ts)
+  features/    auth session + domain components (executions, integrations)
+  components/  ui primitives (Button, Dialog, Fields, Badge, Menu, JsonViewer, Toast…)
+  layouts/     AppShell, Sidebar, AuthLayout, nav config
+  pages/       one file per route
+  utils/       formatting and the status/step vocabulary
+  styles/      design tokens + CSS
 ```
 
-The first command updates `package.json` and `package-lock.json`; commit both (the
-Docker build uses `npm ci`, which requires them to agree). Adding
-`"typecheck": "tsc --noEmit"` to `scripts` and running it in CI is the natural next step.
+## Conventions
+
+- **Workspace scoping.** Workspace query keys include the organization ID. Mutations
+  invalidate that workspace's queries. The API enforces tenant access; cache keys are
+  a UI isolation mechanism, not an authorization boundary.
+- **Roles.** `useWorkspace()` exposes `canManage` (owner/admin) and `canReview`
+  (owner/admin/reviewer), mirroring the checks the API enforces. The UI hides or disables
+  controls; the backend remains the authority.
+- **Statuses** come from `utils/status.ts`. Labels are the backend enum value, humanised;
+  the UI never renames or reinterprets a state.
+- **No fabricated data.** Where the API doesn't expose something (per-step timestamps, an
+  events list, workflow editing), the UI says so instead of inventing it.
+- **Sessions.** The access token lives in `sessionStorage` (per tab) and is never rendered.
+  There is no refresh flow in the API, so an expired or rejected token signs the user out
+  with a notice and returns them to the page they asked for after signing in.
+- Dialogs and drawers use the native `<dialog>` element (focus trap, Escape, focus return).

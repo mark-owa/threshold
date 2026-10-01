@@ -375,7 +375,10 @@ def shopify_callback(code: str, state: str, shop: str, db: Session = Depends(get
     if not settings.OAUTH_SECRET_SINK_URL:
         raise HTTPException(
             status_code=503,
-            detail="OAuth token vault sink is not configured; refusing to exchange and persist merchant credentials",
+            detail=(
+                "OAuth token vault sink is not configured; refusing to "
+                "exchange and persist merchant credentials"
+            ),
         )
     validate_live_endpoint(settings.OAUTH_SECRET_SINK_URL)
     token_url = f"https://{normalized_shop}/admin/oauth/access_token"

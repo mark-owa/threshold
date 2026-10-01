@@ -389,17 +389,15 @@ class ShopifyRefundProvider(RefundProvider):
                 status="failed", response={}, error="shopify_refund_transaction_missing"
             )
         client = self._client(integration)
-        mutation = """
-        mutation ThresholdRefund($input: RefundInput!) {
-          refundCreate(input: $input) @idempotent(key: \"__THRESHOLD_IDEMPOTENCY_KEY__\") {
-            refund { id totalRefundedSet { shopMoney { amount currencyCode } } }
-            userErrors { field message }
-          }
-        }
-        """.replace(
-            "__THRESHOLD_IDEMPOTENCY_KEY__",
-            idempotency_key.replace('"', ""),
-        )
+        safe_key = idempotency_key.replace('"', "")
+        mutation = f"""
+        mutation ThresholdRefund($input: RefundInput!) {{
+          refundCreate(input: $input) @idempotent(key: \"{safe_key}\") {{
+            refund {{ id totalRefundedSet {{ shopMoney {{ amount currencyCode }} }} }}
+            userErrors {{ field message }}
+          }}
+        }}
+        """
         variables = {
             "input": {
                 "orderId": external_order_id,

@@ -69,7 +69,8 @@ Select **Reject** and show the cancelled execution. Approval is an operator deci
 the presence of an approval button does not make an invalid amount executable.
 
 Keep modification demonstrations separate: the API supports modified parameters,
-but this dashboard only exposes Approve and Reject.
+and the current dashboard includes a modify-and-approve form. The existing
+September capture predates that form.
 
 ## Capture list
 

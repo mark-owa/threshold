@@ -88,7 +88,10 @@ def set_live_execution(
             raise HTTPException(
                 status_code=409,
                 detail={
-                    "message": "Private-beta readiness blockers must be resolved before enabling live execution",
+                    "message": (
+                        "Private-beta readiness blockers must be resolved before "
+                        "enabling live execution"
+                    ),
                     "summary": report["summary"],
                     "blockers": [check for check in report["checks"] if check["level"] == "block"],
                 },
@@ -666,7 +669,10 @@ def replay_event(
     if execution is not None:
         raise HTTPException(
             status_code=409,
-            detail="Event already has an execution; recover the execution/action instead of replaying input",
+            detail=(
+                "Event already has an execution; recover the "
+                "execution/action instead of replaying input"
+            ),
         )
     if event.processing_status not in {
         EventProcessingStatus.FAILED,

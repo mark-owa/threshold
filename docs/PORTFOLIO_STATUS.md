@@ -1,34 +1,27 @@
 # Project status
 
-Reviewed on **2026-10-01** against source commit `99d6d03`.
+Updated on **2026-10-01** for the owner-supplied frontend/n8n source import.
 
 ## Available
 
-- A local FastAPI/PostgreSQL refund demo with a React operator dashboard.
-- Source, schema migrations, regression tests, deterministic evaluations, and CI.
-- [Recorded screenshots and approval GIF](DEMO.md#existing-media) from September 19,
-  with a source commit and machine-readable capture evidence.
-- A business case that identifies the fictional data and mock effects.
-- Architecture and reliability documentation covering demo and provider paths.
-
-The root README now shows the existing media, names the actual source files, and
-links dated verification evidence. Historical review and packaging instructions
-are summarized in [HISTORY](HISTORY.md), rather than used as current project claims.
-The existing deletions of `CHANGES.md` and `MERGE_NOTE.md` are preserved.
+- FastAPI/PostgreSQL refund workflow, policy checks, and operator review.
+- Routed React/TypeScript dashboard with TanStack Query and typed API calls.
+- Signed webhook intake and optional n8n/HubSpot final-outcome bridge.
+- Existing billing timestamp migration, regression tests, and CI.
+- Historical September 19 screenshots/GIF with source and capture evidence.
+- Documentation distinguishing mock behavior, source mechanisms, and verified results.
 
 ## Outstanding
 
 | Work | Status |
 | --- | --- |
-| Python dependency audit | The October 1 run failed on PyJWT findings; remediation is pending. |
-| Current dashboard captures | Existing media predates the latest dashboard; recapture pending. |
+| Python dependency audit | PyJWT 2.13.0 still reports 13 findings; remediation pending. |
+| Database-backed import verification | Candidate CI supplies native PostgreSQL checks; see VERIFICATION. |
+| Current dashboard captures | Historical media predates the imported routed dashboard. |
 | Permanent narrated walkthrough | No permanent full-video link is committed. |
-| TypeScript checking | Vite build passes; a real React type-check gate is not configured. |
-| M8 deployment consolidation | Frozen runtime plus build overlays remain; current CI does not build that image. |
+| M8 runtime consolidation | Historical archive/overlays remain separate from canonical source. |
 | Workflow engine structure | Policy, steps, actions, and recovery remain in `engine.py`. |
-| Personal contribution detail | This repository acknowledges AI assistance; a more detailed owner-authored account is not inferred from the archive. |
-| Provider and operations proof | Test-account flows and complete interruption/restore/alert drills remain subject to the documented evidence gaps. |
+| n8n/provider/operations proof | Real-account delivery and interruption/restore/alert drills remain pending. |
 
-[VERIFICATION](VERIFICATION.md) distinguishes current source checks, hosted results,
-recorded demo behavior, and historical staging reports. No customer deployment or
-measured business outcome is claimed.
+[VERIFICATION](VERIFICATION.md) records check results and their environment.
+No customer deployment or measured business outcome is claimed.

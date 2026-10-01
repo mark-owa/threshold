@@ -4,7 +4,7 @@ Threshold treats model output, inbound webhooks, user input, provider responses,
 
 ## Authentication and tenancy
 
-Passwords are bcrypt hashed. Access tokens are short lived JWTs and require issuer, audience, issued-at, not-before, JTI, expiry, subject, and token type claims. Organization membership and role checks scope workspace resources. UUID identifiers reduce trivial sequential enumeration but do not replace authorization.
+Passwords are bcrypt hashed. Access tokens are short lived JWTs and require issuer, audience, issued-at, not-before, JTI, expiry, subject, and token type claims. Organization membership and role checks scope workspace resources. The dashboard stores access tokens in per-tab `sessionStorage` and clears its session on token rejection or expiry; it has no refresh flow. UUID identifiers reduce trivial sequential enumeration but do not replace authorization.
 
 ## HTTP boundary
 
@@ -30,4 +30,4 @@ Transactional outbox rows separate database commits from worker delivery. Extern
 
 The backend production image installs only runtime dependencies and runs as a non-root user. Compose services use read-only filesystems where practical and `no-new-privileges`. Nginx limits body size and adds baseline security headers. TLS is expected at the production ingress/load balancer; the included Compose file is not itself an internet-grade TLS terminator.
 
-CI runs lint, migrations, tests with coverage enforcement, dependency audits, frontend build, and production Compose syntax validation. Backup scripts provide dump creation, catalog verification, and an isolated restore drill. These mechanisms still require an operator to schedule, monitor, and periodically prove them.
+CI runs lint, backend type checks, migrations, tests with coverage enforcement, dependency audits, frontend type/build checks, n8n template checks, and production Compose syntax validation. Backup scripts provide dump creation, catalog verification, and an isolated restore drill. These mechanisms still require an operator to schedule, monitor, and periodically prove them.

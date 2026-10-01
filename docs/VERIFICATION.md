@@ -1,8 +1,27 @@
 # Verification evidence
 
-Evidence reviewed on **2026-10-01** against source commit
-[`99d6d03`](https://github.com/mark-owa/threshold/commit/99d6d033e41c66722172e59da59bb83d1d2d379c).
+Updated on **2026-10-01** for the owner-supplied frontend/n8n source import.
 Results below describe particular commits and environments.
+
+## Source import checks
+
+Repeated locally using Python 3.12 and the pinned development dependencies:
+
+| Check | Result | Scope |
+| --- | --- | --- |
+| `ruff check .` | Passed | Full backend, including retained regression files. |
+| `mypy app` | Passed | 52 application source files. |
+| Unit and loopback HTTP tests | 68 passed | `tests/unit` and `test_n8n_http_delivery.py`; no database or installed n8n runtime. |
+| `npm run build` | Passed | Real React types, `tsc --noEmit`, then Vite; no browser interactions. |
+| `npm audit --audit-level=high` | Passed | No reported frontend findings at import time. |
+| n8n template harness | 16 passed | Workflow structure/JavaScript, signatures and acknowledgment guards. |
+| Deterministic evaluation | 12/12, 8/8, 5/5 | Mock classification, adversarial wording, and extraction fixtures. |
+| Alembic revision graph | One head: `e8b0c234f6a8` | Retains the existing billing timestamp defaults migration. |
+| Python dependency audit | Failed | 13 findings in unchanged PyJWT 2.13.0. |
+
+PostgreSQL and Docker are unavailable locally. Database-backed tests and migration
+application are checked through candidate GitHub Actions before main is updated.
+The current import is not proof of live n8n/HubSpot delivery or browser behavior.
 
 ## Hosted CI
 
@@ -23,7 +42,9 @@ test evidence existed.
 
 Tests exercise task functions and mocked provider behavior. A passing job does not
 prove real Celery broker delivery, live API credentials, or production payment safety.
-The frontend job runs Vite; it does not run a TypeScript type-check or browser test.
+The earlier frontend jobs ran Vite without a TypeScript check. The imported
+workflow now checks TypeScript before Vite and also runs the n8n template harness.
+Neither workflow runs browser interaction tests.
 The deployment job validates Compose syntax; it does not start the production stack.
 The current workflow has no M8 image-build job.
 
@@ -43,7 +64,7 @@ The committed [capture evidence](assets/demo/capture-evidence.json) identifies:
 
 Four screenshots and an approval GIF are committed under `docs/assets/demo/`.
 They show that recorded version, not every view in the later dashboard.
-The capture workflow also generates an MP4 artifact, but a permanent full-video
+The historical capture workflow also generated an MP4 artifact, but a permanent full-video
 link is not committed. Artifact availability is time-limited.
 
 These captures establish the recorded mock flows. They do not establish scheduled
@@ -66,7 +87,7 @@ documentation review; historical reports must not be treated as current live sta
 | --- | --- |
 | Dependency audit | Resolve reported PyJWT findings and obtain a new passing audit. |
 | Current UI | Capture the current dashboard and exercise registration, approvals, retry, and workspace views in a browser. |
-| Type safety | Install the real React types and add a TypeScript type-check gate. |
+| Browser behavior | Exercise routed navigation, session expiry, tenant changes, and action forms. |
 | M8 packaging | Build the separate M8 image in CI and compare its patched runtime with canonical source. |
 | Durable delivery | Exercise persisted intake, outbox publication, worker interruptions, duplicate delivery, and dead-letter recovery together. |
 | Ambiguous provider outcomes | Prove timeout-after-provider-commit, reconciliation, and safe continuation against a test provider. |

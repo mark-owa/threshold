@@ -19,7 +19,8 @@ actions. The local demo uses fictional retail data; no real money moves or email
 
 These captures were recorded against the real Docker Compose application on
 **2026-09-19**, using the mock provider. They show an earlier dashboard version;
-the current source includes additional workspace, integration, and billing views.
+the current source uses React Router and TanStack Query with dedicated workspace,
+integration, approval, recovery, and billing pages.
 Recovery in the recording was triggered manually, with Worker and Beat stopped.
 [Capture evidence](docs/assets/demo/capture-evidence.json) records the source commit
 and execution IDs. The repository includes screenshots and a GIF; a permanent
@@ -45,7 +46,9 @@ full-video link has not been published.
 
 Customer, lead, support, and invoice workflows are smaller classify-and-notify
 examples. Notifications are database records; these examples do not update a CRM
-or deliver email.
+or deliver email. The optional [n8n/HubSpot bridge](START_HERE_N8N.md) updates
+an existing ticket after a verified refund completion or rejection. It uses
+signed intake and a transactional outcome outbox; templates are imported inactive.
 
 ## Run locally
 
@@ -86,19 +89,14 @@ See the [demo guide](docs/DEMO.md) for rejection and recording instructions.
 
 ## Verification
 
-The default Compose backend image installs runtime dependencies only. To run test
-and lint tools in a disposable local demo container, install development dependencies
-there first:
-
-```bash
-docker compose exec --user root backend python -m pip install -r requirements-dev.txt
-```
+Local Compose builds `backend/Dockerfile.dev`, which includes test and lint tools.
+Production Compose uses the runtime-only image.
 
 ```bash
 make test             # PostgreSQL-backed API/workflow regression suite
 make lint             # Ruff
 make eval             # deterministic classification/extraction fixtures
-make frontend-build   # npm ci and Vite build; local Node.js 22.12+ required
+make frontend-build   # npm ci, TypeScript check, and Vite build; Node.js 22.12+ required
 ```
 
 For database-free primitive tests, install `backend/requirements-dev.txt` in a
@@ -112,9 +110,11 @@ passed tests, migrations, frontend checks, and Compose validation but failed the
 Python dependency audit. Its AI evaluation step was skipped after that failure.
 An earlier green run does not establish that current dependencies pass an audit.
 
-Vite builds do not check TypeScript types, and CI does not build the separate M8
-staging image. These results also do not prove live payment behavior or worker crash
-recovery. [Testing](docs/TESTING.md) explains the checks;
+The imported dashboard now runs `tsc --noEmit` before Vite, and CI adds backend
+Mypy and the n8n template harness. Local import checks passed the frontend build,
+backend lint/type checks, 68 unit/HTTP tests, and deterministic evaluation. CI does
+not build the separate M8 staging image. These checks do not prove live payment
+behavior or worker crash recovery. [Testing](docs/TESTING.md) explains the checks;
 [verification](docs/VERIFICATION.md) records results and remaining gaps.
 
 ## Architecture and extended scope
@@ -149,7 +149,8 @@ production payment infrastructure. The demo workspace always selects mock paymen
 | `backend/app/models/`, `backend/alembic/` | SQLAlchemy models and schema migrations |
 | `backend/tests/`, `backend/evals/` | Regression tests and deterministic evaluation data |
 | `frontend/` | React dashboard; [source layout](frontend/README.md) |
-| `deploy/m8/` | Separate frozen staging runtime and compatibility overlays |
+| `integrations/n8n/`, `scripts/check_n8n_templates.cjs` | Inactive CRM bridge templates and their local structure/JavaScript checks |
+| `deploy/m8/` | Historical staging runtime and overlays; separate from the imported canonical source |
 | `docs/` | Design, operational boundaries, and verification history |
 
 ## Limitations
@@ -162,7 +163,7 @@ production payment infrastructure. The demo workspace always selects mock paymen
 - Order-level refunded totals are not a complete payment ledger or proof of safe
   concurrent partial refunds. Customer/order ownership verification needs further work.
 - Refresh tokens, API-key issuance, automatic approval expiry, and immutable audit
-  storage are not implemented. Dashboard tokens are held in memory.
+  storage are not implemented. Dashboard tokens are held in per-tab `sessionStorage`.
 - Redis-backed rate limiting fails open during Redis outages. The demo queue has no
   Redis persistence configuration; queued demo requests lost before database intake
   need resubmission. Persisted webhook intake uses a separate outbox path.

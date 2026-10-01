@@ -147,7 +147,7 @@ def run_demo_scenario(
     user: User = Depends(get_current_user),
 ):
     require_demo_organization(org_id, user.id, db)
-    scenarios = {
+    scenarios: dict[str, dict[str, str | bool]] = {
         "low_risk_refund": {
             "text": "Please refund order #ORD-1002 for $65.00",
             "sender": "jordan@example.com",

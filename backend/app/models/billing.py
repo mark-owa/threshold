@@ -33,7 +33,10 @@ class BillingAccount(Base, UUIDPKMixin, TimestampMixin):
 
 
 class UsageCounter(Base, UUIDPKMixin, TimestampMixin):
-    """Aggregated tenant usage. The composite key makes increments deterministic by period + metric."""
+    """Aggregated tenant usage.
+
+    The composite key makes increments deterministic by period + metric.
+    """
 
     __tablename__ = "usage_counters"
     __table_args__ = (

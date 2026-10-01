@@ -61,3 +61,17 @@ passed tests and frontend checks but failed the Python dependency audit.
 
 The packaging notes `CHANGES.md` and `MERGE_NOTE.md` were removed from main before
 this documentation cleanup. Earlier versions remain available in Git history.
+
+## 2026-10-01: current source import
+
+The owner supplied `Threshold (4)(2).zip` as the intended GitHub version. It replaces
+the canonical dashboard with React Router/TanStack Query pages and adds the optional
+n8n/HubSpot final-outcome bridge. Existing license, billing timestamp migration,
+regression tests, historical demo media, and deployment tooling are retained.
+Documentation cleanup is reconciled with the imported implementation.
+
+The M8 archive remains a separate historical deployment path. Importing canonical
+source does not update that frozen runtime or establish current staging health.
+The supplied September 30 packaging report is summarized in
+[IMPORT_REPORT](IMPORT_REPORT.md); current verification is in
+[VERIFICATION](VERIFICATION.md).

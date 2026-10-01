@@ -179,9 +179,10 @@ class ShopifyAdminClient:
         if not self.shop_domain.endswith(".myshopify.com"):
             raise ValueError("Shopify shop_domain must end with .myshopify.com")
         self.api_version = str(integration.config.get("api_version", "2026-07"))
-        self.token = _credential_value(integration.credential_ref)
-        if not self.token:
+        token = _credential_value(integration.credential_ref)
+        if not token:
             raise ValueError("Shopify access token secret is not configured")
+        self.token = token
         self.url = f"https://{self.shop_domain}/admin/api/{self.api_version}/graphql.json"
         validate_live_endpoint(self.url)
 

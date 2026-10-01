@@ -69,7 +69,9 @@ class WebhookEndpointRequest(BaseModel):
 class RefundPolicyRequest(BaseModel):
     title: str = Field(default="Refund policy", min_length=2, max_length=255)
     content: str = Field(
-        default="Refunds are eligible only inside the configured window and within the order total.",
+        default=(
+            "Refunds are eligible only inside the configured window and within the order total."
+        ),
         min_length=10,
         max_length=4000,
     )

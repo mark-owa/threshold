@@ -11,6 +11,7 @@ import logging
 import sys
 
 import structlog
+from structlog.types import Processor
 
 from app.core.config import get_settings
 
@@ -19,7 +20,7 @@ def configure_logging() -> None:
     settings = get_settings()
     json_logs = settings.APP_ENV != "development"
 
-    shared_processors = [
+    shared_processors: list[Processor] = [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,
         structlog.stdlib.add_logger_name,

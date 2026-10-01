@@ -16,7 +16,6 @@ and other dependency-light helpers. It does not run the complete API/workflow su
 Start the local demo with a disposable PostgreSQL database, then run:
 
 ```bash
-docker compose exec --user root backend python -m pip install -r requirements-dev.txt
 make migrate
 make test
 make lint
@@ -24,8 +23,7 @@ make eval
 ```
 
 The suite creates a dedicated `threshold_test` database on the configured server.
-The first command installs test/lint tools in the disposable demo container because
-the default Compose file builds the runtime-only `backend/Dockerfile`.
+Local Compose builds `backend/Dockerfile.dev`, which includes test/lint tools.
 Use a development/test account with permission to create it. Fixtures isolate tests
 with transactions, including routes that call `commit()`.
 
@@ -41,9 +39,15 @@ Direct task-function tests do not prove Celery transport or crash recovery.
 make frontend-build
 ```
 
-This runs `npm ci` and `npm run build`. Vite builds strip types without checking
-them and do not exercise browser interactions. Real React type declarations and a
-type-check CI gate are still pending; see [frontend/README](../frontend/README.md).
+This runs `npm ci` and `npm run build`: `tsc --noEmit` with the real React types,
+then Vite. It does not exercise browser interactions. See
+[frontend/README](../frontend/README.md).
+
+Run `node scripts/check_n8n_templates.cjs` for template structure/JavaScript checks.
+`pytest -q tests/unit tests/test_n8n_http_delivery.py` from `backend/` checks helpers
+and real loopback HTTP delivery without PostgreSQL. `tests/test_n8n_bridge.py` needs
+PostgreSQL and covers intake signatures, tenant binding, conflicting events, and
+final outcome persistence.
 
 ## AI evaluation
 
@@ -55,8 +59,9 @@ Mock fixture results do not establish live-model accuracy or prompt-injection re
 
 The current CI deployment job validates production Compose syntax.
 It does not start the production stack or build `deploy/m8/Dockerfile`.
-The separate capture workflow starts a disposable demo and checks recorded mock
-flows with manual retry. Follow [DEMO](DEMO.md) for the walkthrough.
+The September capture workflow checked a disposable demo with manual retry.
+Its selectors target the earlier dashboard and are not retained as current
+automation after this import. Follow [DEMO](DEMO.md) for a new walkthrough.
 
 [VERIFICATION](VERIFICATION.md) links actual results, including the October 1 Python
 audit failure. [HISTORY](HISTORY.md) retains the scope of earlier local checks.

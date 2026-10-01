@@ -30,7 +30,7 @@ from app.models.enums import (
     RequestCategory,
 )
 
-EXPECTED_SCHEMA_REVISION = "e8b0c234f6a8"
+EXPECTED_SCHEMA_REVISION = "d7a9b123e5f7"
 
 ReadinessLevel = Literal["pass", "warn", "block"]
 
@@ -110,7 +110,10 @@ def configuration_checks(settings: Settings | None = None) -> list[ReadinessChec
     ) or (settings.AI_PROVIDER == "anthropic" and bool(settings.ANTHROPIC_API_KEY))
     if settings.AI_PROVIDER == "mock":
         ai_level: ReadinessLevel = "warn" if settings.BETA_ALLOW_MOCK_AI else "block"
-        ai_detail = "Mock AI is enabled; set BETA_ALLOW_MOCK_AI=true only for a non-customer validation environment."
+        ai_detail = (
+            "Mock AI is enabled; set BETA_ALLOW_MOCK_AI=true only for a "
+            "non-customer validation environment."
+        )
     elif ai_credential_present:
         ai_level = "pass"
         ai_detail = f"{settings.AI_PROVIDER} is configured with a server-side credential."
@@ -131,7 +134,10 @@ def configuration_checks(settings: Settings | None = None) -> list[ReadinessChec
             "pass" if oauth_ready else "block",
             "OAuth client and server-side token sink are configured."
             if oauth_ready
-            else "SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET, and OAUTH_SECRET_SINK_URL are required for merchant onboarding.",
+            else (
+                "SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET, and "
+                "OAUTH_SECRET_SINK_URL are required for merchant onboarding."
+            ),
             "integrations",
         )
     )
@@ -149,7 +155,10 @@ def configuration_checks(settings: Settings | None = None) -> list[ReadinessChec
             "pass" if billing_ready else "warn",
             "Billing checkout, webhook, and self-serve prices are configured."
             if billing_ready
-            else "Billing is incomplete. This does not block a free private beta, but paid signup must remain disabled.",
+            else (
+                "Billing is incomplete. This does not block a free private "
+                "beta, but paid signup must remain disabled."
+            ),
             "commercial",
         )
     )
@@ -307,7 +316,10 @@ def tenant_checks(
             "pass" if live_enabled else "warn",
             "Live provider execution is enabled for this workspace."
             if live_enabled
-            else "Live provider execution is disabled. Enable it only after this gate has no blockers.",
+            else (
+                "Live provider execution is disabled. Enable it only after "
+                "this gate has no blockers."
+            ),
             "tenant",
         )
     )
@@ -326,7 +338,10 @@ def tenant_checks(
             "pass" if policy_ready else "block",
             "Refund rules are persisted."
             if policy_ready
-            else "Configure refund window and automatic-refund limits before enabling live execution.",
+            else (
+                "Configure refund window and automatic-refund limits before "
+                "enabling live execution."
+            ),
             "tenant",
         )
     )
@@ -362,7 +377,10 @@ def tenant_checks(
                 "pass" if shopify_secret and webhook_secret else "block",
                 "Admin token and webhook secret references resolve without exposing their values."
                 if shopify_secret and webhook_secret
-                else "Shopify Admin API and webhook secret references must both resolve in deployment secrets.",
+                else (
+                    "Shopify Admin API and webhook secret references must both "
+                    "resolve in deployment secrets."
+                ),
                 "integrations",
             )
         )
@@ -388,7 +406,10 @@ def tenant_checks(
                 "pass" if credential_ok else "block",
                 f"{refund_provider.provider.value} selected and credential reference resolves."
                 if credential_ok
-                else f"{refund_provider.provider.value} is selected but its credential reference does not resolve.",
+                else (
+                    f"{refund_provider.provider.value} is selected but its "
+                    f"credential reference does not resolve."
+                ),
                 "integrations",
             )
         )
@@ -398,7 +419,10 @@ def tenant_checks(
                 "refund_executor",
                 "Exactly one live refund executor",
                 "block",
-                f"Found {len(refund_integrations)} enabled refund executors; exactly one is required.",
+                (
+                    f"Found {len(refund_integrations)} enabled refund executors; "
+                    f"exactly one is required."
+                ),
                 "integrations",
             )
         )
@@ -421,7 +445,10 @@ def tenant_checks(
             "reviewer_coverage",
             "Human reviewer coverage",
             "pass" if human_reviewers >= 2 else "warn",
-            f"{human_reviewers} member(s) can make approval decisions. Two or more are recommended for beta coverage.",
+            (
+                f"{human_reviewers} member(s) can make approval decisions. "
+                f"Two or more are recommended for beta coverage."
+            ),
             "tenant",
         )
     )
