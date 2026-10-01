@@ -30,11 +30,12 @@ jobs:
           cp .env.example .env
           docker compose up -d --build postgres redis backend frontend
           for attempt in $(seq 1 60); do
-            if curl -fsS http://localhost:5173/health && curl -fsS http://localhost:8000/ready; then break; fi
+            if curl -fsS http://localhost:5173/health; then break; fi
             sleep 2
           done
-          curl -fsS http://localhost:8000/ready
+          curl -fsS http://localhost:5173/health
           docker compose exec -T backend alembic upgrade head
+          curl -fsS http://localhost:8000/ready
           docker compose exec -T backend python -m scripts.seed_demo_org
       - name: Install capture tools
         working-directory: tooling/capture
