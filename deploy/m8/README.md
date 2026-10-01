@@ -25,5 +25,8 @@ Build the staging image from the repository root with:
 docker build -f deploy/m8/Dockerfile deploy/m8
 ```
 
-Repository CI is expected to catch packaging regressions before this deployment
-path is changed further.
+Current repository CI validates canonical backend/frontend source and production
+Compose syntax; it does not build this M8 image. A successful canonical CI run
+therefore does not verify the archive or overlays. Add an image-build check and
+compare the patched runtime with canonical source before further deployment changes.
+See [verification evidence](../../docs/VERIFICATION.md).

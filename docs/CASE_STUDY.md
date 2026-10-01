@@ -1,7 +1,7 @@
 # A refund request with an inspectable decision trail
 
 **Status:** simulated business case using fictional retail data. No real payments,
-customers, deployment, time savings, or revenue results are claimed.
+customer deployment, measured time savings, or revenue results are claimed.
 
 ## The operational problem
 
@@ -17,7 +17,7 @@ why a workflow completed, paused, or failed, then take the supported next action
 
 The seeded retailer has a 30-day refund window and a $75 automatic limit. Eligibility
 also requires a completed order, a valid nonnegative age, and a positive amount in
-whole cents no larger than the order total.
+whole cents no larger than the remaining refundable balance.
 
 | Example input | Expected reference behavior | Evidence to inspect |
 |---|---|---|
@@ -54,16 +54,18 @@ testing; those integrations are not demonstrated here.
 
 ## Results and limitations
 
-The result is a portfolio prototype with a configured demo, source, tests, and
-documented boundaries. There are no measured business outcomes. The dashboard's
+The result is a portfolio prototype with source, tests, and recorded mock-demo
+screenshots and an approval GIF. [Capture evidence](assets/demo/capture-evidence.json)
+identifies the September 19 version; it does not verify every later dashboard change.
+There are no measured business outcomes. The dashboard's
 hours-saved metric assumes 15 minutes per automatically completed execution;
 reused actions can still contribute completed executions, so it is not verified ROI.
 
 Default classification and extraction use deterministic mock rules. Optional live
 provider adapters exist, but this presentation makes no live-model accuracy claim.
-Refund effects and notifications remain local database records. There is no
-cumulative payment ledger, customer/order ownership check, or proven external
-delivery/crash-recovery guarantee.
+Demo refund effects and notifications remain local database records. The broader
+source has provider adapters and an outbox, but no complete payment ledger,
+customer/order ownership check, or proven external delivery/crash-recovery guarantee.
 
 [Follow the demo](DEMO.md) · [Inspect the architecture](ARCHITECTURE.md) ·
 [Read failure behavior](RELIABILITY.md)

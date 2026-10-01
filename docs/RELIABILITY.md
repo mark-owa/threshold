@@ -1,77 +1,76 @@
 # Reliability model
 
-Threshold demonstrates deduplication and observable recovery for database-only mock
-actions. It does not establish at-least-once delivery to a real external provider.
-There is no transactional outbox or provider reconciliation protocol.
+The local demo demonstrates duplicate handling and recovery with mock payments.
+The broader source includes persisted webhook intake, an outbox, action leases,
+provider adapters, and reconciliation. Implemented mechanisms and verified runtime
+guarantees are kept separate.
 
-## What happens when something goes wrong
+## Failure behavior
 
-| Condition | Implemented behavior | Boundary to explain |
-|---|---|---|
-| Same event key submitted again in one organization | Returns the existing workflow execution. | A different key is a new event; identical text alone does not deduplicate it. |
-| New event asks for the same successful order/amount refund | Reuses the canonical action result. | No cumulative partial-refund ledger or external-provider guarantee. |
-| Missing amount or failed automatic eligibility | Pauses for reviewer action when extraction succeeds. | An invalid provider result can fail extraction instead of reaching approval. |
-| Reviewer rejects | Cancels the workflow and records the decision. | No refund action is created on this path. |
-| Reviewer supplies invalid modified parameters | Fails the workflow before creating a refund action. | Modification is available through the API; the dashboard has Approve and Reject only. |
-| One simulated action timeout | Retains a failed workflow and a scheduled retryable action. | This is an injected demo failure, not a real payment-provider timeout. |
-| Retry succeeds | Updates the same action, clears retry/error state, and completes the workflow. | The demo retry records mock success; it does not contact a provider. |
-| Attempt limit reached | Marks the action dead-letter and removes its retry schedule. | No replay UI; the one-time timeout scenario does not naturally demonstrate repeated outages. |
-| Circuit open or integration disabled before action creation | Stops execution. | There is no action for the retry endpoint to recover; the request needs a new event after the cause is resolved. |
-| Database or worker process unavailable | Processing or persistence can fail. | Durable broker delivery, process-kill recovery, and guaranteed audit persistence are not demonstrated. |
+| Condition | Behavior | Limit |
+| --- | --- | --- |
+| Repeated event key in one organization | Reuses the existing event/execution. | Different keys represent different requests. |
+| Same successful order/amount action | Reuses the canonical action result when action validation allows it. | A canonical key is not a cumulative refund ledger or external exactly-once proof. |
+| Missing amount or failed policy | Requires review after successful extraction. | Malformed provider output can fail before an approval/action exists. |
+| One-time demo timeout | Records a failed execution and retry schedule. | Mock failure, not an actual payment-provider outage. |
+| Retryable provider outcome | Schedules another attempt within the budget. | Transport and provider behavior require separate integration evidence. |
+| Ambiguous provider outcome | Marks the action `UNKNOWN`; ordinary retry is rejected pending reconciliation. | Reconciliation itself needs provider-specific test evidence. |
+| Attempt budget exhausted | Marks the action dead-letter and clears its schedule. | Operator investigation is required. |
+| Integration disabled or circuit open | Blocks action execution; forced retry does not bypass these gates. | A failure before action creation may need a new event. |
+| Worker lease expires | Stale action recovery marks ambiguity for reconciliation; stale event recovery handles recoverable intake states. | A committed running workflow cannot always be safely reconstructed. |
+| Broker publication fails | Persisted outbox records support later publication attempts. | The legacy demo queue publishes before database intake and can lose unpersisted work. |
 
-## Retry lifecycle
+## Retry and reconciliation
 
-```text
-Action executing
-  -> failed
-  -> RETRYING + next_retry_at
-  -> Celery Beat selects due action
-  -> retry
-  -> succeeded + verification
-  -> or DEAD_LETTER after max attempts
+The demo schedules `threshold.retry_due_actions` once per minute. Backoff makes an
+action eligible; scheduler timing is not a wall-clock guarantee. Delays are bounded,
+and the reference action has a three-attempt budget including the initial attempt.
+
+Manual retry locks the failed execution, checks action state, budget, integration,
+and circuit status, then invokes the configured provider. The canonical implementation
+does not automatically send this manual path through the action outbox. Automatic
+external-action recovery and new non-demo action intents use the durable worker path.
+
+The action key is retained across attempts. A verified result completes the action;
+an unknown result has no ordinary retry schedule. Reconciliation queries the
+provider and updates state rather than blindly repeating an ambiguous side effect.
+
+```mermaid
+flowchart TD
+    A["Action attempt"] --> R{"Outcome"}
+    R -->|Verified| S["Succeeded"]
+    R -->|Retryable; budget remains| B["Backoff"]
+    B --> A
+    R -->|Budget exhausted| D["Dead-letter"]
+    R -->|Ambiguous| U["UNKNOWN"]
+    U --> C{"Reconciliation"}
+    C -->|Verified| S
+    C -->|Safe to retry| B
+    C -->|Still ambiguous| U
 ```
 
-Backoff is deterministic and bounded. These delays make an action eligible;
-the scheduled task polls once per minute, so they are not promises of wall-clock
-retry timing. The helper supports the delays below;
-the reference refund action permits three total attempts, including the initial one:
+## Outbox and worker recovery
 
-| Attempt | Delay |
-|---:|---:|
-| 1 | 1s |
-| 2 | 2s |
-| 3 | 4s |
-| 4 | 8s |
-| 5 | 16s |
-| 6 | 32s |
-| 7+ | 60s |
+Webhook intake commits its incoming event and outbox record together.
+The dispatcher claims publication work with a lease, sends a Celery task, and
+records publication success or failure. Publication can be repeated around a crash;
+database keys and worker state checks are therefore needed in addition to the outbox.
 
-The action keeps the same idempotency key across retries. A successful existing action is reused rather than executed again.
+Non-demo actions persist an intent and require the live-execution switch at creation
+and again in the action worker. Recovery tasks inspect stale actions and events.
+These mechanisms cannot make a database and an external payment provider one atomic
+transaction or guarantee immutable audit persistence during a database outage.
 
-## Circuit breaker
+## What has been verified
 
-Each organization/provider integration tracks consecutive failures. After the configured failure threshold, the integration is opened until the recovery timeout elapses. During the open window, new action execution is rejected with `integration_circuit_open` rather than continuing to hammer a failing dependency. A successful execution resets the failure counter and closes the circuit.
+Hosted CI exercises regression cases against PostgreSQL and mocked provider
+boundaries. The committed September demo captures show manual mock recovery.
+They do not establish broker delivery or worker restart recovery.
 
-## Dead-letter behavior
+Historical M8 staging reports include Redis-interruption observations, but several
+provider and duplicate-delivery exit criteria remain incomplete. M8 uses a frozen
+runtime plus build overlays and can differ from canonical source. See
+[VERIFICATION](VERIFICATION.md) and [STAGING_MILESTONES](STAGING_MILESTONES.md).
 
-When `attempt_count >= max_attempts`, the action becomes `dead_letter`. The workflow remains failed and the dead-letter transition is written to the audit log. Operators can investigate the action without silently replaying a business side effect.
-
-## Demo behavior
-
-`simulate_failure_once` is a controlled test/demo flag. It intentionally produces a deterministic external timeout so the dashboard can demonstrate failure, retry scheduling, and recovery. It is not a production integration failure simulator.
-
-## Worker behavior
-
-`threshold.retry_due_actions` is scheduled every minute by Celery Beat. The task selects due retryable actions and delegates execution back to `WorkflowEngine.retry_failed_execution`. The API's manual retry path can force a retry for an authorized operator.
-
-## Scope limits
-
-All side effects are database-only mocks. An open circuit blocks new actions and
-retry attempts; `force=True` skips the backoff delay but does not bypass that gate
-or re-enable a disabled integration. A failure before an action row is created
-(such as an open circuit) has no action to retry and needs resubmission as a new event.
-
-Successful retries clear their schedule/error and update execution context and
-approval results. Dead-letter rows remain failed for inspection; there is no replay UI.
-The one-time timeout demo does not exercise repeated provider outages. Process-kill
-recovery, durable broker delivery, and a real payment provider protocol remain unimplemented.
+Before live use, test timeout-after-provider-commit, duplicate delivery, worker loss,
+outbox failure, and reconciliation together against disposable test infrastructure.

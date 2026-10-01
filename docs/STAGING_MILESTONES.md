@@ -1,5 +1,11 @@
 # Threshold — Staging to Private Beta Milestones
 
+**Historical staging report, September 2026.** These observations describe the
+separate M8 runtime deployed at that time. Service health, credentials, and recovery
+drills were not rerun during the October 1 documentation review. Recorded PASS
+statuses apply only to their stated scope; incomplete exit criteria remain pending.
+Current canonical CI has no M8 image-build job. See [VERIFICATION](VERIFICATION.md).
+
 Status legend: `TODO` · `IN PROGRESS` · `BLOCKED` · `PASS`
 
 ## Milestone 0 — Core infrastructure
@@ -14,7 +20,7 @@ Exit evidence:
 - Public API `/health` returns HTTP 200.
 - Public API `/ready` returns HTTP 200 and therefore verifies database reachability.
 
-Current staging API:
+Staging API recorded at the time:
 `https://threshold-api-production.up.railway.app`
 
 ## Milestone 1 — Real frontend deployment
@@ -41,7 +47,7 @@ Exit criteria:
 - Overview, Approvals, Executions, Actions, Recovery, Policies, Integrations, Team, Billing & usage, Beta readiness, Audit log, and Demo sandbox all open successfully.
 
 ## Milestone 2 — Core SaaS smoke test
-**Status: PASS**
+**Status: IN PROGRESS** — recorded subchecks passed; the exit criteria below are incomplete.
 
 Validated evidence (2026-09-18):
 - Seeded owner authentication succeeds in the deployed UI.
@@ -52,11 +58,11 @@ Validated evidence (2026-09-18):
 - No live execution, integrations, invitations, billing purchases, policy changes, approvals, or deletions were performed.
 
 Additional CI evidence (2026-09-18):
-- A dedicated `m8-runtime` GitHub Actions job now builds the exact `/deploy/m8` Docker artifact used by Railway.
+- The September 18 report recorded a dedicated `m8-runtime` job building the `/deploy/m8` artifact used by Railway. That job is absent from the current CI workflow.
 - The full M8 Alembic migration chain completes successfully in that image.
 - 9/9 SaaS/RBAC regression tests passed against real PostgreSQL/Redis-backed CI.
 - Coverage includes registration creating an isolated trial workspace, membership-scoped workspace listing, workspace creation, trial/demo boundary, membership enforcement, hashed invitations, admin role restrictions, last-owner protection, and onboarding/policy behavior.
-- Automated live creation of a second login identity was not performed because the browser automation safety layer blocks account creation; registration is therefore CI-proven rather than browser-proven.
+- Creation of a second login identity was not exercised in the recorded browser session; reported registration coverage came from CI.
 
 Evidence so far:
 - Seeded demo login: PASS.
@@ -67,9 +73,8 @@ Evidence so far:
 - Billing UI now renders demo/trialing state and usage without a 500.
 
 Still required for exit:
-- Fresh registration path.
-- New workspace creation/select path.
-- Explicit cross-workspace isolation test.
+- Fresh registration path in the browser.
+- Explicit adversarial cross-workspace isolation test beyond the recorded workspace-selection smoke check.
 
 Work:
 - Register a test user.
@@ -84,13 +89,13 @@ Exit criteria:
 - No cross-workspace data leakage observed.
 
 ## Milestone 3 — Controlled workflow end-to-end
-**Status: PASS**
+**Status: IN PROGRESS** — recorded subchecks passed; the exit criteria below are incomplete.
 
 Evidence so far:
 - Low-risk refund demo execution `5907e7b5-bfce-4796-992b-17baa6dc5791`: completed; all 8 workflow steps succeeded; mock action succeeded and verification passed.
 - High-risk execution `83fdb801-2eb8-402a-bce5-c24a84e9201e`: correctly stopped at `approval_gate` with status `awaiting_approval`.
 - Approval `86779dda-aa86-43b3-b485-0896f7b02ce9` was created because $89.99 exceeded the $75 auto-approval limit; no action executed before human authority.
-- Celery Beat/Worker path is live: periodic `dispatch_outbox`, `recover_stale_actions`, `retry_due_actions` and `recover_stale_events` tasks are repeatedly received and completed successfully.
+- Celery Beat/Worker path was reported active: periodic `dispatch_outbox`, `recover_stale_actions`, `retry_due_actions` and `recover_stale_events` tasks are repeatedly received and completed successfully.
 - Recovery/Beta UI reports zero failed/dead-letter inbound events and zero failed/dead-letter outbox messages.
 
 Still required for exit:
@@ -130,7 +135,6 @@ Still required before PASS:
 - Live OAuth install against a development store.
 - Real signed webhook delivery.
 - Canonical Admin GraphQL order sync.
-- Runtime credential/vault read support for OAuth-written merchant tokens. **DONE:** merged commit `1c43af6f87e89e514f4ef7facf187849375f6bcd`; env secrets retain priority, OAuth-managed refs fall back to the authenticated vault read endpoint; M8 CI passed and API/Worker/Beat deployed successfully.
 - Expiring offline-token refresh lifecycle where required.
 
 Exit criteria:
@@ -164,7 +168,7 @@ Exit criteria:
 - Duplicate delivery does not duplicate business effect.
 
 ## Milestone 6 — Failure and recovery drills
-**Status: PASS**
+**Status: IN PROGRESS** — recorded subchecks passed; the exit criteria below are incomplete.
 
 Passed staging evidence:
 - Simulated provider transient failure/retry: PASS. Execution `ee4d04d5-b046-40fc-a3fc-2b8789565ac7` failed at the mock execute step with `simulated_external_timeout`; the periodic `threshold.retry_due_actions` worker then processed exactly 1 due retry and the same execution transitioned to `COMPLETED`. Live provider execution remained disabled throughout.
@@ -187,7 +191,7 @@ Key recovery deployments:
 - Final Redis cutover deployment: `405e67d6-e92f-43d5-a7fb-ddb294380507`.
 
 Still required before PASS:
-- Provider transient-failure drill.
+- Live/test-account provider transient-failure drill beyond the simulated mock case.
 - Provider commit + client timeout -> `UNKNOWN` -> reconciliation drill.
 - Explicit duplicate-delivery/idempotency replay proof.
 - Explicit outbox retry/dead-letter drill.
@@ -204,7 +208,7 @@ Exit criteria:
 Observability evidence:
 - Railway resource metrics were captured for API, Worker, Beat, Postgres and Redis.
 - Current staging resource usage is light relative to the 1 GB service memory limits.
-- A recurring Threshold staging health watch is enabled to check `/health` and `/health/ready` and notify only on meaningful failures.
+- A recurring staging health watch was reported configured to check `/health` and `/health/ready`. Current operation and actual alert delivery were not rechecked.
 - Do not set `BETA_ALERTING_CONFIGURED=true` until an alert has actually fired/tested successfully.
 
 Backup/restore status:

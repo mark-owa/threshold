@@ -1,8 +1,26 @@
 # Threshold demonstration and recording guide
 
-**Recording status:** script and capture plan prepared; no recorded video or product
-screenshots are included yet. Use the real application, default mock provider, and
-fictional seeded data. The architecture SVG is a diagram, not an application capture.
+Screenshots and an approval GIF from the September 19 mock demo are committed.
+They show an earlier dashboard version and manual retry. A permanent full-video
+link is not published. Use the real application, default mock provider, and
+fictional seeded data for a new recording.
+
+## Existing media
+
+| Asset | File |
+| --- | --- |
+| Dashboard | [Overview](assets/demo/dashboard-overview.png) |
+| Human review | [Approval required](assets/demo/approval-required.png) |
+| Execution steps | [Execution inspector](assets/demo/execution-inspector.png) |
+| Manual recovery | [Retry recovery](assets/demo/retry-recovery.png) |
+| Approval animation | [Approval GIF](assets/demo/approval-demo.gif) |
+| Source and checked IDs | [Capture evidence](assets/demo/capture-evidence.json) |
+
+The [successful capture run](https://github.com/mark-owa/threshold/actions/runs/35411976554)
+used source commit `6f0f36a5db6d4f7b8c83f0bf67d1e7e7a967db87`.
+Worker and Beat were stopped. These assets do not prove scheduled delivery, current
+dashboard behavior, or live payments. The workflow generated a time-limited MP4
+artifact; publish a reviewed copy before linking a permanent walkthrough.
 
 ## Prepare the real application
 
@@ -39,9 +57,10 @@ check that no terminal or settings panel exposes real credentials.
 The failed step's error is visible in the dashboard; its output does not display
 the failed action identifier. Before recording, use the existing authenticated
 `GET /api/v1/ops/audit?org_id=<organization-id>` endpoint to compare `action_id`
-in the `action_failed` and `action_retried_and_succeeded` event payloads. The
-successful retry's step output also includes the action ID. The dashboard audit
-feed itself displays event labels, not their full payloads.
+in the failure and retry event payloads. Canonical source currently emits
+`action_retried_and_verified` for a successful manual retry; earlier captures used
+the previous event naming. The dashboard audit feed displays event labels, not
+their full payloads. Compare API payloads to confirm action identity.
 
 ## Optional second clip: rejection
 
@@ -54,19 +73,18 @@ but this dashboard only exposes Approve and Reject.
 
 ## Capture list
 
-| Intended asset | What it must show | Destination after capture |
+| Asset to refresh | What it must show | Existing destination |
 |---|---|---|
-| Overview screenshot | Authenticated dashboard with a small amount of relevant demo history. | `assets/dashboard-overview.png` |
-| Approval screenshot | The $89.99 request, pending approval, and proposed parameters. | `assets/approval-required.png` |
-| Execution screenshot | Completed workflow with readable rule/action/verification outputs. | `assets/execution-inspector.png` |
-| Recovery screenshot | The failed step plus successful retry steps in the same execution. | `assets/retry-recovery.png` |
-| Short GIF | One approval progressing to completion, with a clear starting state. | `assets/approval-demo.gif` |
+| Overview screenshot | Authenticated dashboard with a small amount of relevant demo history. | `assets/demo/dashboard-overview.png` |
+| Approval screenshot | The $89.99 request, pending approval, and proposed parameters. | `assets/demo/approval-required.png` |
+| Execution screenshot | Completed workflow with readable rule/action/verification outputs. | `assets/demo/execution-inspector.png` |
+| Recovery screenshot | Failure and verified recovery in the same execution. | `assets/demo/retry-recovery.png` |
+| Short GIF | One approval progressing to completion, with a clear starting state. | `assets/demo/approval-demo.gif` |
 | Full walkthrough | The real three-minute sequence above, with narration or readable captions. | Video attachment or approved video host; link only after upload succeeds. |
 
-These are planned filenames, not existing links. Do not replace missing captures
-with invented interface screenshots or scripted playback of fabricated API results.
-Confirm the runtime works first, then capture once and reuse the same assets in the
-README and case study.
+Refresh these assets against the current runtime and update the source commit in
+capture evidence. Preserve the distinction between recorded results and intended
+behavior; the architecture SVG is an illustration, not an application screenshot.
 
 ## Completion check
 

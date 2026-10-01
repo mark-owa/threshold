@@ -32,9 +32,10 @@ The UI intentionally exposes the deterministic/AI boundary rather than presentin
 | `src/nav.ts` | Tab names and titles |
 | `src/components/` | One file per view, plus `AuthScreen` and `CreateWorkspacePanel`, which own their own form state |
 
-`parseResponse` returns a discriminated union: reading a response body without first
-checking `ok` is a type error, not a runtime surprise. The API types in `types.ts` are
-compile-time only; responses are not validated at runtime.
+`parseResponse` returns a discriminated union intended to require checking `ok`
+before using the response body. That protection needs a real TypeScript type-check;
+the current Vite build does not enforce it. API types are compile-time declarations,
+and responses are not validated at runtime.
 
 ## Type-checking
 

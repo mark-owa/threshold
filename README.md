@@ -1,225 +1,177 @@
 # Threshold
 
-Threshold is a refund-handling workflow you can run locally: a FastAPI backend and a
-React operator dashboard. It takes a refund request, extracts the order and amount,
-checks deterministic policy, and either records a mock refund or pauses for human
-review. In the demo, no real money moves and no email is sent.
+Refund review and recovery with Python, FastAPI, PostgreSQL, and a React dashboard.
 
-Every decision is inspectable: each step's input, output, timing, and failure is
-persisted, and a paused request shows *which* policy rules it failed.
+Threshold takes a refund request, extracts an order and amount, checks policy, and
+either records a mock refund or pauses for an authorized reviewer. Operators can
+inspect step inputs and outputs, approve or reject requests, and investigate failed
+actions. The local demo uses fictional retail data; no real money moves or email is sent.
 
-## The business problem
+## Demo
 
-A refund request involves more than extracting a number from a message. Someone has to
-check the order, apply policy, decide when a human should look at it, and understand
-what happened when processing fails. Threshold makes those decisions and outcomes
-visible in one place.
+![Threshold operator dashboard](docs/assets/demo/dashboard-overview.png)
 
-The reference case is a fictional retail operation. It demonstrates an approach to
-controlled automation; it is not a customer deployment or evidence of measured savings.
+| Human review | Failure and recovery |
+| --- | --- |
+| ![Refund awaiting approval](docs/assets/demo/approval-required.png) | ![Failed refund and manual recovery](docs/assets/demo/retry-recovery.png) |
 
-![Architecture overview: dashboard, API and workflow engine, PostgreSQL, and optional queued workers](docs/assets/architecture-overview.svg)
+![Approval progressing to completion](docs/assets/demo/approval-demo.gif)
 
-**Start here:** [Business case](docs/CASE_STUDY.md) ·
-[Three-minute demo guide](docs/DEMO.md) · [Architecture](docs/ARCHITECTURE.md)
+These captures were recorded against the real Docker Compose application on
+**2026-09-19**, using the mock provider. They show an earlier dashboard version;
+the current source includes additional workspace, integration, and billing views.
+Recovery in the recording was triggered manually, with Worker and Beat stopped.
+[Capture evidence](docs/assets/demo/capture-evidence.json) records the source commit
+and execution IDs. The repository includes screenshots and a GIF; a permanent
+full-video link has not been published.
 
-The demo guide walks through the actual dashboard. Screenshots and a recorded
-walkthrough are not yet included; the diagram above is an architecture illustration.
+[Three-minute walkthrough](docs/DEMO.md) · [Business case](docs/CASE_STUDY.md) ·
+[Architecture](docs/ARCHITECTURE.md) · [Verification evidence](docs/VERIFICATION.md)
 
-## What the demo shows
+## What it demonstrates
 
-- Ordered workflow steps with persisted inputs, outputs, timing, and failures.
-- A narrow AI boundary: classification and structured extraction only, with a
-  deterministic mock provider by default (OpenAI and Anthropic adapters are optional).
-- Refund eligibility and amount thresholds kept in ordinary Python and policy data,
-  not in a model. A failed check reports the specific rules that tripped
-  (for example `outside_refund_window`, `amount_exceeds_refundable_balance`).
-- Authenticated, tenant-scoped inspection. Approve, reject, and retry are limited to
-  reviewers, admins, and owners; viewers are read-only.
-- Duplicate-event handling, canonical refund keys, scheduled retries, a circuit
-  breaker, and dead-letter records.
-- PostgreSQL migrations, regression tests, structured request logs, and a small
-  labeled evaluation dataset.
+- **Policy before execution:** order, remaining refundable amount, refund window,
+  and automatic approval limit are checked in Python. Model confidence does not
+  authorize a refund. The current rule output reports `eligible`, `policy_failed`,
+  or `order_not_found`; it does not enumerate every failed policy condition.
+- **Human review:** tenant-scoped approvals and decisions restricted to reviewers,
+  admins, and owners. Approval does not bypass order and amount validation.
+- **Inspectable execution:** persisted steps, errors, action attempts, and audit records.
+- **Duplicate handling:** separate event keys and canonical order/amount refund keys.
+- **Recovery:** scheduled retries, circuit state, dead-letter records, and explicit
+  reconciliation for ambiguous provider outcomes.
+- **A narrow AI boundary:** classification and structured extraction, with a
+  deterministic mock provider by default and optional OpenAI/Anthropic adapters.
 
-Customer, lead, support, and invoice inquiries use smaller classify-and-notify
-workflows. Notifications are local database records; those flows do not implement
-CRM updates, lead qualification, or a helpdesk integration.
+Customer, lead, support, and invoice workflows are smaller classify-and-notify
+examples. Notifications are database records; these examples do not update a CRM
+or deliver email.
 
 ## Run locally
 
-Requires Docker with Compose and Make. From the repository root:
+Requires Docker with Compose. From the repository root, copy the example environment
+only on first setup; preserve an existing `.env`.
 
 ```bash
 cp .env.example .env
-make up
-make migrate
-make seed
-```
-
-Open the dashboard at **http://localhost:5173** and sign in with:
-
-- `owner@acme-demo.example.com` / `demo1234`
-- `reviewer@acme-demo.example.com` / `demo1234`
-
-These are public demo credentials for local use. Use a fresh disposable demo database;
-older demo logins and refund keys are not data-migrated. API documentation is at
-http://localhost:8000/docs. `/health` checks the API process; `/ready` checks the
-database connection. `make seed-history` adds examples across all five categories.
-
-Try **Low-risk refund**, **High-risk refund**, and **Failure + retry**. A
-**Policy-failing refund** enters the approval queue; use Reject to demonstrate
-cancellation. A reviewer may override the automatic policy gate, but the action
-still requires an existing order and a positive amount no greater than its total.
-Missing amounts require review and modification; they are never inferred as zero.
-
-Failure + retry creates a fresh mock order so an earlier successful refund cannot
-hide the simulated timeout. It records a failed workflow and a scheduled action;
-use Retry for immediate recovery or let Celery Beat check due actions each minute.
-Repeated ordinary demos reuse an existing successful refund for the same order and
-amount, while retaining a separate event/execution record.
-
-### API example
-
-Log in first and copy the returned `access_token` into `TOKEN`:
-
-```bash
-curl -s http://localhost:8000/api/v1/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"owner@acme-demo.example.com","password":"demo1234"}'
-
-TOKEN='<returned access_token>'
-curl -s http://localhost:8000/api/v1/demo/orgs/acme-demo/events \
-  -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"idempotency_key":"example-001","payload":{"text":"Refund order #ORD-1002 for $65.00"}}'
-```
-
-### Windows / PowerShell without Make
-
-With Docker Desktop running, open PowerShell in the repository root:
-
-```powershell
-Copy-Item .env.example .env
 docker compose up -d --build
 docker compose exec backend alembic upgrade head
 docker compose exec backend python -m scripts.seed_demo_org
 ```
 
-Copy the example only on first setup; preserve an existing `.env`. The same dashboard
-URL and demo logins apply.
+On Windows PowerShell, use `Copy-Item .env.example .env` for the first command.
+The remaining Docker commands are the same. With Make installed, the equivalents
+are `make up`, `make migrate`, and `make seed`.
 
-## Verify
+Open **http://localhost:5173** and sign in with either public local-demo account:
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Owner | `owner@acme-demo.example.com` | `demo1234` |
+| Reviewer | `reviewer@acme-demo.example.com` | `demo1234` |
+
+Use a disposable demo database. Existing demo users and older refund keys are not
+automatically migrated by the seed script. API documentation is at
+http://localhost:8000/docs; `/health` checks the API process and `/ready` checks
+database reachability.
+
+Try **Low-risk refund**, **High-risk refund**, and **Failure + retry**. The seeded
+policy has a $75 automatic limit and a 30-day window. Old seeded orders can age out
+of that window. The failure scenario creates a fresh mock order and injects one
+timeout; use Retry for immediate recovery or allow Beat to schedule it. Repeated
+ordinary demos can reuse a successful refund action while retaining separate events.
+
+`docker compose down` stops the stack and keeps its named PostgreSQL volume.
+See the [demo guide](docs/DEMO.md) for rejection and recording instructions.
+
+## Verification
+
+The default Compose backend image installs runtime dependencies only. To run test
+and lint tools in a disposable local demo container, install development dependencies
+there first:
 
 ```bash
-make test             # PostgreSQL-backed API and workflow tests
-make lint             # Ruff checks
-make eval             # deterministic classification/extraction evaluation
-make frontend-build   # requires local Node.js 22.12+ and npm
+docker compose exec --user root backend python -m pip install -r requirements-dev.txt
 ```
-
-For just the primitive tests without Docker (Python 3.12+):
 
 ```bash
-python -m venv .venv
-# Activate .venv using your shell's activation command.
-python -m pip install -r backend/requirements-dev.txt
-make unit-test
+make test             # PostgreSQL-backed API/workflow regression suite
+make lint             # Ruff
+make eval             # deterministic classification/extraction fixtures
+make frontend-build   # npm ci and Vite build; local Node.js 22.12+ required
 ```
 
-**Verification status, plainly:** a CI workflow is defined (lint, migrations, tests
-with a coverage floor, dependency audits, frontend build), but no successful hosted
-run is recorded for this repository yet, and earlier reported test results came from a
-PostgreSQL-compatible emulator rather than the full Docker stack. Run `make test`
-yourself before relying on any of it. [TESTING](docs/TESTING.md) covers test
-isolation and what each check does and does not establish;
-[VERIFICATION](docs/VERIFICATION.md) records what has been re-checked and when.
+For database-free primitive tests, install `backend/requirements-dev.txt` in a
+Python 3.12+ virtual environment and run `make unit-test`.
 
-The backend image includes development tools because this Compose setup is a local
-demo environment. `make down` stops containers; PostgreSQL data remains in its named
-volume.
+**Evidence checked on 2026-10-01:** [CI at commit `12bf94a`](https://github.com/mark-owa/threshold/actions/runs/36611807246)
+passed backend lint, migrations, PostgreSQL-backed tests, dependency audits,
+deterministic evaluation, frontend build, and production Compose syntax validation.
+The later [run at `99d6d03`](https://github.com/mark-owa/threshold/actions/runs/36797036742)
+passed tests, migrations, frontend checks, and Compose validation but failed the
+Python dependency audit. Its AI evaluation step was skipped after that failure.
+An earlier green run does not establish that current dependencies pass an audit.
 
-## Beyond the demo: the multi-tenant layer
+Vite builds do not check TypeScript types, and CI does not build the separate M8
+staging image. These results also do not prove live payment behavior or worker crash
+recovery. [Testing](docs/TESTING.md) explains the checks;
+[verification](docs/VERIFICATION.md) records results and remaining gaps.
 
-The reference workflow sits on top of a tenant-aware platform layer, built to explore
-what it takes to move from "works in a demo" toward "safe to point at real merchants."
-It is **private-beta scaffolding, not a production service**, and none of it is needed
-to run or evaluate the refund demo above.
+## Architecture and extended scope
 
-- **Workspaces and access control:** organizations, role-based permissions
-  (owner/admin/reviewer/viewer), team invitations, tenant-scoped data.
-- **Durable execution:** a transactional outbox, worker leases with stale-work
-  recovery, and an `UNKNOWN` state for ambiguous provider outcomes that requires
-  reconciliation instead of a blind retry (to avoid double refunds).
-- **Integrations:** Shopify and Stripe adapters and a configurable generic REST
-  refund provider, with signed webhooks and credential-by-reference.
-- **Commercial scaffolding:** trials, plan entitlements, usage metering, and Stripe
-  Checkout/Portal handoff.
-- **Safety gates:** live provider execution is off by default for non-demo workspaces
-  and is enabled only through a beta-readiness gate, with an owner/admin kill switch
-  that the durable worker also enforces.
+![Threshold component architecture](docs/assets/architecture-overview.svg)
 
-The demo workspace always uses the mock provider. What has and has not been proven
-for this layer (real Shopify/Stripe connections, a secret-vault lifecycle, restore
-drills, failure injection) is spelled out in
-[SaaS Milestone 8](docs/SAAS_MILESTONE_8.md); the build history is in
-[SaaS build](docs/SAAS_BUILD.md) and the `SAAS_MILESTONE_*` docs.
+The diagram illustrates the local demo. FastAPI and SQLAlchemy persist workflow
+state in PostgreSQL; Redis/Celery provide queued work and periodic tasks. React
+provides the operator interface.
 
-## Repository map
+The broader source also includes workspaces and roles, signed webhook intake,
+transactional outbox records, worker leases, Shopify/Stripe/generic REST provider
+adapters, trials, usage metering, and a live-execution switch. Those features are
+private-beta scaffolding. They are not established customer deployments or verified
+production payment infrastructure. The demo workspace always selects mock payments.
 
-| Path | Purpose |
-|---|---|
-| `backend/app/api/` | Auth, operations, approvals, workspace, billing, webhook, and demo routes |
-| `backend/app/workflows/` | Workflow engine (`engine.py`), generic step handlers (`steps.py`), refund eligibility rules (`refund_rules.py`), and deterministic primitives |
-| `backend/app/ai/` | Provider adapters and prompt resolution |
-| `backend/app/integrations/` | Shopify, Stripe, and generic REST refund providers |
-| `backend/app/services/` | Outbox, entitlements/usage, and beta-readiness checks |
-| `backend/app/core/` | Config, security, middleware, and webhook signing |
-| `backend/app/models/` | SQLAlchemy models |
-| `backend/app/workers/` | Celery ingestion, delivery, and recovery tasks |
-| `backend/alembic/` | Database migrations |
-| `backend/scripts/`, `backend/evals/` | Demo fixtures and evaluation data |
-| `backend/tests/` | Unit and API/workflow regression tests |
-| `frontend/` | React operator dashboard; see [`frontend/README.md`](frontend/README.md) for the source layout |
-| `docs/` | Architecture, API, decisions, security, and limitations |
+[Architecture](docs/ARCHITECTURE.md) separates demo and provider paths.
+[Reliability](docs/RELIABILITY.md) explains retry and reconciliation boundaries.
+[Staging milestones](docs/STAGING_MILESTONES.md) retain historical deployment reports;
+[Milestone 8](docs/SAAS_MILESTONE_8.md) describes the beta gate and required proof.
 
-## Scope and limitations
+## Source map
 
-This is a portfolio project, not a production payment or automation service.
+| Path | Responsibility |
+| --- | --- |
+| `backend/app/api/` | Authentication, tenants, approvals, operations, billing, webhooks, and demo routes |
+| `backend/app/workflows/engine.py` | Workflow steps, refund policy, approval continuation, action execution, retries, and reconciliation |
+| `backend/app/workflows/primitives.py` | Deterministic normalization, mock classification/extraction, and retry delays |
+| `backend/app/ai/` | Model providers and prompt resolution |
+| `backend/app/integrations/` | Refund providers and Shopify order integration |
+| `backend/app/services/`, `backend/app/workers/` | Outbox, usage/readiness services, delivery, and recovery tasks |
+| `backend/app/models/`, `backend/alembic/` | SQLAlchemy models and schema migrations |
+| `backend/tests/`, `backend/evals/` | Regression tests and deterministic evaluation data |
+| `frontend/` | React dashboard; [source layout](frontend/README.md) |
+| `deploy/m8/` | Separate frozen staging runtime and compatibility overlays |
+| `docs/` | Design, operational boundaries, and verification history |
 
-- The demo's actions and notifications are mocks. Threshold is not a payment ledger.
-- Approval resume and action retry target the reference refund workflow. They are
-  not a generic continuation engine for arbitrary workflow definitions, and the
-  refund rules are deliberately isolated in one module rather than presented as
-  general-purpose.
-- Not implemented: refresh tokens, API-key issuance, automatic approval expiry, and
-  immutable audit storage. Access tokens are short-lived and held in memory by the
-  dashboard.
-- Rate limiting is Redis-backed and deliberately fails open if Redis is unavailable,
-  so a cache outage is not a total outage; monitor Redis and readiness accordingly.
-- Ingestion is serialized per organization for simple duplicate handling. High-load
-  concurrency is not established.
-- Redis queue persistence is not guaranteed by the demo Compose configuration.
-  Requests lost before database processing need resubmission.
-- Live model calls need credentials and a provider-compatible model configuration.
-  The small mock evaluations do not establish accuracy on real customer requests.
-- "Hours saved" in the dashboard assumes 15 minutes per automatically completed
-  workflow; it is illustrative.
+## Limitations
 
-[Architecture](docs/ARCHITECTURE.md) · [API](docs/API.md) ·
-[Reliability](docs/RELIABILITY.md) · [Security](docs/SECURITY.md)
+- The business case is simulated. No customer success, revenue, or measured savings
+  are claimed. The dashboard's hours-saved metric assumes 15 minutes per automatically
+  completed workflow.
+- Approval continuation and retries target the reference refund flow, rather than
+  arbitrary workflow definitions. Most orchestration still resides in `engine.py`.
+- Order-level refunded totals are not a complete payment ledger or proof of safe
+  concurrent partial refunds. Customer/order ownership verification needs further work.
+- Refresh tokens, API-key issuance, automatic approval expiry, and immutable audit
+  storage are not implemented. Dashboard tokens are held in memory.
+- Redis-backed rate limiting fails open during Redis outages. The demo queue has no
+  Redis persistence configuration; queued demo requests lost before database intake
+  need resubmission. Persisted webhook intake uses a separate outbox path.
+- Live AI accuracy, actual provider account flows, high-load concurrency, and complete
+  interruption/restore drills need separate evidence. The M8 archive and overlays also
+  need consolidation with canonical source.
 
-## Related freelance work
-
-This project is relevant to scoped Python backend work: validating incoming records,
-connecting an internal dashboard to an API, implementing approval steps, and debugging
-duplicate processing or failed automation. Its provider boundary also illustrates how
-structured extraction can feed deterministic rules.
-
-A real payment, CRM, or email integration would be a separate implementation with its
-own authentication, delivery, and verification requirements.
-
-Need help with a similar internal process? In your enquiry, include the current
-workflow, a redacted sample input, the expected result, and what should require
-human approval.
+Development used AI assistance. Repository history includes source imports and later
+maintenance; it does not record every original implementation step. Earlier review
+reports and their limits are summarized in [History](docs/HISTORY.md).
 
 MIT license; see [LICENSE](LICENSE).

@@ -93,10 +93,20 @@ An owner enables it through the beta-readiness control only when the live readin
 
 Both action creation **and the durable worker** enforce the switch. This matters because disabling a workspace after an action has been queued must still stop the provider call. A blocked queued action becomes a known FAILED state without contacting the provider; after the incident is resolved and live execution is re-enabled, the operator may retry it.
 
-Manual retries for live providers now re-enter the durable outbox/worker path. They do not issue provider requests from the HTTP API process. The synchronous retry behavior remains only for the isolated mock demo provider.
+The archived M8 staging report describes manual live retries entering the durable
+worker path. Canonical source at `99d6d03` differs: the manual retry endpoint calls
+`WorkflowEngine.retry_failed_execution`, which invokes the configured provider
+directly. New non-demo action intents and worker recovery use the outbox. Consolidate
+and test these paths before relying on the staging report's manual-retry boundary.
 
 ## Development versus production containers
 
-Milestone 7 hardened the backend production image to install production dependencies only. M8 corrects the resulting local-test ergonomics by adding `backend/Dockerfile.dev`, which installs `requirements-dev.txt` and is used only by `docker-compose.yml`.
+`backend/Dockerfile` installs runtime dependencies and uses a non-root user.
+`backend/Dockerfile.dev` also exists and installs development dependencies, but
+the current `docker-compose.yml` uses the default `backend/Dockerfile`; it does
+not select the development image. Follow [TESTING](TESTING.md) to install test/lint
+tools in a disposable local container before using the Make targets.
 
-`docker-compose.prod.yml` continues to use the hardened `backend/Dockerfile`: production dependencies only, non-root user, read-only filesystem/no-new-privileges at runtime. This keeps `make test` functional without reintroducing test tooling into the production image.
+`docker-compose.prod.yml` uses the runtime image with its production runtime
+restrictions. The presence of a development Dockerfile alone does not make
+`make test` work in a container that lacks development dependencies.

@@ -1,64 +1,34 @@
-# Threshold portfolio handover
+# Project status
 
-Prepared on **2026-09-16** from the supplied four-project bundle. This is a
-documentation and presentation pass; implementation, tests, dependencies,
-migrations, Docker configuration, and CI configuration are preserved.
+Reviewed on **2026-10-01** against source commit `99d6d03`.
 
-## Completed
+## Available
 
-| Deliverable | Location |
-|---|---|
-| Business-first introduction, navigation, related services, enquiry guidance | [README](../README.md) |
-| Fictional retail case study with implementation boundaries | [CASE_STUDY](CASE_STUDY.md) |
-| Component architecture visual and refund flow diagram | [ARCHITECTURE](ARCHITECTURE.md) and [SVG](assets/architecture-overview.svg) |
-| Failure/response table and retry timing clarification | [RELIABILITY](RELIABILITY.md) |
-| Three-minute recording script and capture plan | [DEMO](DEMO.md) |
-| Current checks separated from earlier reported results | [VERIFICATION](VERIFICATION.md) |
-| Equivalent Docker commands for PowerShell without Make | Root README |
-| More precise data-model wording | [DATABASE](DATABASE.md) |
+- A local FastAPI/PostgreSQL refund demo with a React operator dashboard.
+- Source, schema migrations, regression tests, deterministic evaluations, and CI.
+- [Recorded screenshots and approval GIF](DEMO.md#existing-media) from September 19,
+  with a source commit and machine-readable capture evidence.
+- A business case that identifies the fictional data and mock effects.
+- Architecture and reliability documentation covering demo and provider paths.
 
-## Verification of this package
+The root README now shows the existing media, names the actual source files, and
+links dated verification evidence. Historical review and packaging instructions
+are summarized in [HISTORY](HISTORY.md), rather than used as current project claims.
+The existing deletions of `CHANGES.md` and `MERGE_NOTE.md` are preserved.
 
-- All existing application and configuration files were compared byte-for-byte
-  against the uploaded archive; only the documented Markdown files changed.
-- Existing files changed: `README.md`, `docs/ARCHITECTURE.md`,
-  `docs/RELIABILITY.md`, `docs/TESTING.md`, and `docs/DATABASE.md`.
-- New files: `docs/CASE_STUDY.md`, `docs/DEMO.md`, `docs/VERIFICATION.md`,
-  `docs/PORTFOLIO_STATUS.md`, and `docs/assets/architecture-overview.svg`.
-- Local Markdown file links and the SVG were checked. The SVG was rendered and
-  visually inspected for readability. No product screenshot was substituted.
-- The final ZIP was integrity-checked. Non-Threshold entries were preserved
-  byte-for-byte from the supplied bundle.
+## Outstanding
 
-The analysis pass parsed 53 Python files and ran 25 deterministic fixture examples.
-No new full-suite or end-to-end result is claimed; see the evidence ledger.
+| Work | Status |
+| --- | --- |
+| Python dependency audit | The October 1 run failed on PyJWT findings; remediation is pending. |
+| Current dashboard captures | Existing media predates the latest dashboard; recapture pending. |
+| Permanent narrated walkthrough | No permanent full-video link is committed. |
+| TypeScript checking | Vite build passes; a real React type-check gate is not configured. |
+| M8 deployment consolidation | Frozen runtime plus build overlays remain; current CI does not build that image. |
+| Workflow engine structure | Policy, steps, actions, and recovery remain in `engine.py`. |
+| Personal contribution detail | This repository acknowledges AI assistance; a more detailed owner-authored account is not inferred from the archive. |
+| Provider and operations proof | Test-account flows and complete interruption/restore/alert drills remain subject to the documented evidence gaps. |
 
-## Still pending
-
-1. Run the native stack in a Docker-capable environment with dependency access.
-2. Verify the actual dashboard paths and capture the four planned screenshots,
-   short GIF, and 2–4-minute video. The working environment for this pass could not
-   run the full application, so those assets have not been created.
-3. Replace the README's recording-status sentence with real asset links only after
-   capture and validation. Confirm actual video accessibility.
-4. Add the owner's verified personal contribution statement and chosen public
-   contact channel when preparing the GitHub profile. Do not infer sole authorship,
-   client work, deployment history, or commercial outcomes from this archive.
-5. Publish to the intended GitHub repository and check the rendered README, SVG,
-   Mermaid flow, and links there. No GitHub publication occurred in this pass.
-
-The connected account was previously identified as `mark-owa`. The suggested
-repository name is `threshold`; this document does not assert that it exists.
-Live service deployment is separate from publishing the repository.
-
-## Attribution and scope
-
-This documentation pass used AI-assisted source inspection, writing, and diagram
-creation. It does not reconstruct the original code's development history or
-attribute unsupported personal contributions. The source code and existing MIT
-license remain intact. The default demonstration uses fictional data and mock
-effects; no production-readiness or measured-ROI claim was added.
-
-For the next pass, start with the pending list and existing demo script. Reuse this
-assessment unless the code changes; a full repeat inspection is not required merely
-to add the missing captures.
+[VERIFICATION](VERIFICATION.md) distinguishes current source checks, hosted results,
+recorded demo behavior, and historical staging reports. No customer deployment or
+measured business outcome is claimed.
