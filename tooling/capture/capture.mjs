@@ -130,7 +130,7 @@ try {
   assert(recovered.steps.some(s => s.status === 'failed'));
   assert.equal(recovered.context.verified, true);
   const audit = await api(`ops/audit?org_id=${org}&limit=200`);
-  const failed = audit.find(a => a.execution_id === failure.execution_id && a.event_type === 'action_failed');
+  const failed = audit.find(a => a.execution_id === failure.execution_id && a.event_type === 'action_provider_result' && a.payload.outcome === 'retryable_failure');
   const done = audit.find(a => a.execution_id === failure.execution_id && a.event_type === 'action_retried_and_verified');
   assert(failed && done);
   assert(failed.payload.action_id);
