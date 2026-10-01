@@ -69,6 +69,49 @@ Keep marketing/outreach triggers disabled for these synthetic ticket updates.
 Repeated PATCH requests can still affect downstream automations depending on their
 configuration even when the ticket's final stored value is unchanged.
 
+### HubSpot API preflight
+
+Before publishing the outcome workflow, use a separate manual n8n HTTP Request
+node to read the dedicated fictional ticket. This check does not change its stage.
+Select the same HTTP Bearer Auth credential used by `Update Existing HubSpot Ticket`.
+Keep the credential in n8n; do not put its value in the URL, workflow JSON, or chat.
+
+| Setting | Value |
+| --- | --- |
+| Method | `GET` |
+| URL | `https://api.hubapi.com/crm/v3/objects/tickets/TICKET_ID` |
+| Query parameter | `properties=subject,hs_pipeline,hs_pipeline_stage` |
+| Authentication | Generic Credential Type → HTTP Bearer Auth |
+| Response | JSON; include status/headers; disable redirects |
+
+Substitute only the dedicated ticket's ID. Success is HTTP 200 with a JSON body
+whose `id` matches that ticket and whose `properties` describe the expected
+fictional request. Record its `hs_pipeline` and current `hs_pipeline_stage`.
+Read `https://api.hubapi.com/crm/v3/pipelines/tickets/PIPELINE_ID` with that pipeline
+ID to identify its internal stages, or inspect the same pipeline in HubSpot settings.
+Both configured terminal stages must belong to that ticket's pipeline.
+
+`app.hubspot.com` URLs open the HubSpot website. Do not copy a browser record URL
+into an API node. HTTP 200 containing `<!doctype html>` or a HubSpot page is not a
+successful ticket API response. Check the full request URL and any redirect, then
+rerun the read before submitting anything to Threshold.
+
+If the API returns an error, inspect its JSON body as well as the status:
+
+| Result | Next action |
+| --- | --- |
+| 401 | Check the selected Bearer credential and token validity in n8n. |
+| 403 with `MISSING_SCOPES` | Inspect the API's required scopes and the credential's app/account permissions. Contact access alone does not establish ticket access. |
+| 404 | Check the ticket ID and that the credential belongs to the intended practice account. |
+| 429 or transient 5xx | Respect the retry guidance; do not treat the preflight as passed. |
+| HTML, missing `id`, or another ticket ID | Check the URL and response format; do not proceed on status alone. |
+
+The [n8n HubSpot credential reference](https://docs.n8n.io/integrations/builtin/credentials/hubspot/)
+lists the `tickets` scope for ticket operations. Verify the requirements for the
+credential type and account actually in use rather than guessing scope names.
+A successful GET proves read access only; write access remains unverified until
+the signed outcome updates the dedicated ticket and receives a matching acknowledgment.
+
 ## 3. Import the OUTCOME workflow first
 
 Import `02_sync_outcome_to_hubspot.json` into n8n. It is inactive and has no secrets.
@@ -211,10 +254,13 @@ execution data by default to reduce persistence of webhook authentication header
 Check your instance's execution retention/redaction settings before real use.
 
 This implementation does not prove live-provider readiness. It does not change
-Threshold's existing payment safety gates. PostgreSQL integration tests, worker
-interruption tests, and a live n8n/HubSpot demonstration remain required. The merged
-build also exercises a real local HTTP receiver; that does not establish n8n/CRM
-runtime behavior. See [VERIFICATION](VERIFICATION.md) for current evidence and [historical n8n checks](history/N8N_VERIFICATION.md) for the earlier packaging review.
+Threshold's existing payment safety gates. The 2026-10-01 CI passed 177 tests on
+PostgreSQL 16, including bridge persistence checks. The suite also exercises a
+real loopback HTTP receiver and the template harness checks 16 workflow/JavaScript
+cases. These checks do not execute the exports in n8n or update a real HubSpot ticket.
+Worker interruption tests and a live n8n/HubSpot demonstration remain required.
+See [VERIFICATION](VERIFICATION.md) for dated evidence and [historical n8n checks](history/N8N_VERIFICATION.md)
+for the earlier packaging review.
 
 ## Reference documentation checked during implementation
 
@@ -222,4 +268,6 @@ runtime behavior. See [VERIFICATION](VERIFICATION.md) for current evidence and [
 - https://docs.n8n.io/integrations/builtin/credentials/crypto/
 - https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/
 - https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.respondtowebhook/
+- https://docs.n8n.io/integrations/builtin/credentials/hubspot/
 - https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/tickets/guide
+- https://developers.hubspot.com/docs/api-reference/crm-pipelines-v3/guide

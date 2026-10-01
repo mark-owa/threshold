@@ -26,7 +26,7 @@ connecting external tools. Keep public demo credentials confined to the local de
 Then run the new integration tests against the disposable test database:
 
 ```powershell
-docker compose exec backend pytest tests/test_n8n_bridge.py tests/unit/test_n8n_outcomes.py -q
+docker compose exec backend pytest tests/test_n8n_bridge.py tests/test_n8n_http_delivery.py tests/unit/test_n8n_outcomes.py -q
 ```
 
 **Next:** follow [the integration guide](docs/N8N_INTEGRATION.md), starting with
@@ -35,13 +35,20 @@ secret setup and endpoint registration. The n8n workflow JSON files are under
 
 ## What is ready, and what still needs your environment
 
-- Backend implementation, focused tests, two inactive n8n templates, and this setup guide are included.
-- No n8n workflow has been imported/published in your account.
-- No HubSpot ticket or credential has been created or changed by this build.
-- 96 Python tests, frontend build/typecheck and the template harness passed here.
-- 41 PostgreSQL-dependent tests were blocked by the unavailable database; Docker,
-  browser interactions and a real n8n → Threshold → HubSpot run remain unverified.
-  See [current verification](docs/VERIFICATION.md). Earlier packaging checks are in [history](docs/history/README.md).
+- Backend implementation, focused tests, two inactive n8n exports, and this setup guide are included.
+- CI passed 177 tests against PostgreSQL 16 on 2026-10-01, including bridge persistence
+  tests. Backend lint/types, frontend audit/type/build, the 16-check template harness,
+  and production Compose syntax also passed. The Python dependency audit reported zero findings.
+- A separate Docker/Chromium capture verified the dashboard's stated mock refund,
+  approval, and manual recovery flows. Worker and Beat were absent from that capture.
+- A real n8n → Threshold → HubSpot round trip is still unverified. Account credentials,
+  reachable endpoints, installed n8n node compatibility, and worker delivery must be
+  checked in the environment used for that run.
+
+See [current verification](docs/VERIFICATION.md) for dated evidence. Earlier packaging
+checks are in [history](docs/history/README.md). Before submitting a refund, complete
+the [HubSpot API preflight](docs/N8N_INTEGRATION.md#hubspot-api-preflight) using the
+same credential that will update the fictional ticket.
 
 n8n Cloud cannot reach `localhost` on your laptop. For the intake workflow, use
 an HTTPS development endpoint reachable from n8n, or run n8n locally on a network
