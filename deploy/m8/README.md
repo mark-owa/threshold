@@ -1,6 +1,8 @@
-# M8 staging image
+# Legacy M8 staging snapshot
 
-This directory packages the M8 staging runtime used for deployment validation.
+This directory preserves the earlier M8 staging runtime for deployment compatibility.
+Current application source is in `backend/` and `frontend/`. Builds from this
+snapshot do not include later canonical changes.
 
 ## Source model
 
@@ -8,7 +10,7 @@ The canonical Threshold application remains in the repository's normal source tr
 M8 carries a frozen backend runtime archive plus a small set of staging hardening
 overlays that were introduced during deployment validation.
 
-The Docker image now consumes `threshold_m8_backend_runtime.tar.gz` directly.
+The snapshot image consumes `threshold_m8_backend_runtime.tar.gz` directly.
 Older Base64 chunk files were removed because they only reconstructed the same
 archive and made the build harder to review.
 

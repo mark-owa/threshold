@@ -80,7 +80,7 @@ Supported scenarios: `low_risk_refund`, `high_risk_refund`, `rejected_refund`, `
 `POST /api/v1/demo/orgs/{org_slug}/events/queue` accepts the same event body
 as synchronous ingestion and returns a task ID with HTTP 202.
 `GET /api/v1/ops/tasks/{task_id}` requires login and returns coarse task state
-only; task ownership is not tenant-mapped. Broker transport was not tested in this review.
+only; task ownership is not tenant-mapped. Task-function tests and manual browser captures do not establish broker transport.
 
 `POST /api/v1/ops/executions/{execution_id}/retry?org_id=<uuid>` requires
 reviewer permission and skips the backoff delay, while respecting the circuit

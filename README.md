@@ -134,10 +134,11 @@ adapters, trials, usage metering, and a live-execution switch. Those features ar
 private-beta scaffolding. They are not established customer deployments or verified
 production payment infrastructure. The demo workspace always selects mock payments.
 
+[Current scope](docs/SCOPE.md) lists implemented features and remaining work.
 [Architecture](docs/ARCHITECTURE.md) separates demo and provider paths.
 [Reliability](docs/RELIABILITY.md) explains retry and reconciliation boundaries.
-[Staging milestones](docs/STAGING_MILESTONES.md) retain historical deployment reports;
-[Milestone 8](docs/SAAS_MILESTONE_8.md) describes the beta gate and required proof.
+[Historical reports](docs/history/README.md) retain earlier milestones and staging observations;
+[Beta readiness](docs/SAAS_MILESTONE_8.md) describes the beta gate and required proof.
 
 ## Source map
 

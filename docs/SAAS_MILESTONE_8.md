@@ -1,6 +1,6 @@
-# SaaS Milestone 8 — Private Beta Validation
+# Beta readiness and validation
 
-Milestone 8 is a proof milestone, not a feature-expansion milestone. Threshold now has a repeatable launch gate and validation tooling that distinguishes code presence from operational evidence.
+The readiness gate reports configuration and runtime checks for a tenant. Operators must supply dated restore, alerting, and ownership evidence before enabling live execution.
 
 ## Beta readiness gate
 

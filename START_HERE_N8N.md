@@ -41,7 +41,7 @@ secret setup and endpoint registration. The n8n workflow JSON files are under
 - 96 Python tests, frontend build/typecheck and the template harness passed here.
 - 41 PostgreSQL-dependent tests were blocked by the unavailable database; Docker,
   browser interactions and a real n8n → Threshold → HubSpot run remain unverified.
-  See [the merge report](docs/IMPORT_REPORT.md) and [verification details](docs/N8N_VERIFICATION.md).
+  See [current verification](docs/VERIFICATION.md). Earlier packaging checks are in [history](docs/history/README.md).
 
 n8n Cloud cannot reach `localhost` on your laptop. For the intake workflow, use
 an HTTPS development endpoint reachable from n8n, or run n8n locally on a network

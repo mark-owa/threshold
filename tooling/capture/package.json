@@ -1,0 +1,7 @@
+{
+  "name": "threshold-dashboard-capture",
+  "private": true,
+  "type": "module",
+  "scripts": { "capture": "node capture.mjs" },
+  "devDependencies": { "playwright": "1.55.1", "agent-browser": "0.38.1" }
+}

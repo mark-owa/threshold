@@ -84,7 +84,7 @@ retry delivery, worker restart recovery, or live payments.
 checks, and later static frontend checks. Historical test counts and stub-based
 type checks are not current runtime guarantees.
 
-[Staging milestones](STAGING_MILESTONES.md) retain September deployment and
+[Staging milestones](history/STAGING_MILESTONES.md) retain September deployment and
 interruption-drill reports. They refer to a separate M8 runtime archive and build
 overlays. Service health, credentials, and those drills were not rerun during this
 documentation review; historical reports must not be treated as current live status.
