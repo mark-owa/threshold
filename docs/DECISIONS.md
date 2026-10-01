@@ -12,7 +12,7 @@
 | Signed n8n final outcomes | CRM receives the final result without executing the refund itself. | Delivery is at least once; the receiver needs duplicate-tolerant downstream automation. |
 | Organization-scoped query keys | Dashboard reads and invalidation follow the selected workspace. | API authorization remains essential; a cache key is not an access-control mechanism. |
 | Per-tab sessionStorage | Reload preserves the tab session and rejected/expired tokens clear it. | Browser script access remains possible; there is no refresh-token flow. |
-| Direct backend pins and npm lockfile | Dependency changes are visible and frontend installs are reproducible. | Python transitive dependencies are not fully locked, and the current PyJWT pin fails audit. |
+| Direct backend pins and npm lockfile | Dependency changes are visible and frontend installs are reproducible. | Python transitive dependencies are not fully locked, so resolved versions can change between builds. |
 
 The canonical application is `backend/` plus `frontend/`. The legacy M8 image uses
 a frozen runtime and overlays. See [Deployment](DEPLOYMENT.md) for that separation

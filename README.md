@@ -100,13 +100,18 @@ make frontend-build   # npm ci, TypeScript check, and Vite build; Node.js 22.12+
 For database-free primitive tests, install `backend/requirements-dev.txt` in a
 Python 3.12+ virtual environment and run `make unit-test`.
 
-**Checked on 2026-10-01:** [CI for the current application source](https://github.com/mark-owa/threshold/actions/runs/36803992153)
-applied all nine migrations and passed **162 PostgreSQL-backed tests**, with
-**72.29% coverage**. Backend lint/type checks, frontend audit/type/build checks,
-the n8n template harness, and production Compose syntax validation passed.
+**Checked on 2026-10-01:** [CI at `8f966fc`](https://github.com/mark-owa/threshold/actions/runs/36820489132)
+passed backend lint/type checks, all nine migrations, **177 PostgreSQL-backed tests**
+with **72.29% coverage**, frontend audit/type/build checks, the n8n template harness,
+and production Compose syntax validation.
 
-The Python dependency audit failed with **13 findings in PyJWT 2.13.0**; the
-following AI evaluation step was skipped. Deterministic evaluation passed locally.
+PyJWT is pinned to **2.15.1**. The Python dependency audit reports **no known
+vulnerabilities**; no findings are ignored. Twenty security tests cover password
+handling, valid/expired tokens, malformed timestamps, issuer/audience checks,
+signatures, allowed algorithms, and options reuse. The deterministic AI evaluation
+also passed: 12/12 base classifications, 8/8 adversarial classifications, and 5/5
+extractions.
+
 The separate browser capture above verifies the stated mock flows. These results
 do not prove live payments, worker crash recovery, or the legacy M8 image.
 [Testing](docs/TESTING.md) explains the checks; [Verification](docs/VERIFICATION.md)
