@@ -1,6 +1,9 @@
-# Verification of the frontend + n8n merge — 30 September 2026
+# Historical frontend + n8n merge verification — 30 September 2026
 
-These are results from this merged build, replacing the earlier n8n-only report.
+These are reported checks bundled with the September 30 source archive. Current
+GitHub import checks and native PostgreSQL evidence are recorded in
+[VERIFICATION](VERIFICATION.md). The old environment limitations and counts below
+describe that earlier packaging review.
 
 | Check | Result | Evidence boundary |
 | --- | --- | --- |

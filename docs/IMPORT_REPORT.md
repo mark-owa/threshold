@@ -15,6 +15,10 @@ regression tests, historical media, and deployment tooling. Current canonical
 source is under `backend/` and `frontend/`; `deploy/m8/` remains a historical frozen
 runtime and does not automatically consume those sources.
 
+Two existing workflow safeguards are retained: an open circuit defers manual
+retry, and a disabled mock integration blocks execution rather than being replaced
+with a new enabled integration. The existing lifecycle regression covers both.
+
 The prior dashboard files are replaced by the routed frontend. Old capture
 automation is removed because it targets the previous dashboard; its recordings
 and original source remain available in Git history.
