@@ -14,7 +14,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Edit only these non-secret values. Use one dedicated test ticket per request.\nconst config = {\n  threshold_url: 'https://simultaneously-decided-links-griffin.trycloudflare.com/api/v1/webhooks/ugO_EODO88DejY350GK9312jm3nDDU2B',\n  portal_id: '247531757',\n  ticket_id: '337799898846',\n  text: 'Refund order #ORD-1002 for $65.00',\n  sender: 'ana.bootcamp@example.com'\n};\nif (!/^https:\\/\\//.test(config.threshold_url)) throw new Error('Configure an HTTPS Threshold URL reachable from n8n Cloud');\nfor (const key of ['portal_id','ticket_id']) if (!/^[0-9]{1,32}$/.test(config[key])) throw new Error('Configure ' + key);\nconst event_id = 'hubspot:' + config.portal_id + ':ticket:' + config.ticket_id;\nconst payload = {text: config.text, sender: config.sender, external_id: event_id,\n  crm: {provider:'hubspot', portal_id:config.portal_id, ticket_id:config.ticket_id}};\nconst raw_body = JSON.stringify(payload);\nconst timestamp = String(Math.floor(Date.now()/1000));\nreturn [{json: {url:config.threshold_url, event_id, raw_body, timestamp,\n  signed_text:timestamp + '.' + raw_body}}];"
+        "jsCode": "// Edit only these non-secret values. Use one dedicated test ticket per request.\nconst config = {\n  threshold_url: 'REPLACE_WITH_THRESHOLD_WEBHOOK_URL',\n  portal_id: 'REPLACE_WITH_HUBSPOT_PORTAL_ID',\n  ticket_id: 'REPLACE_WITH_EXISTING_TEST_TICKET_ID',\n  text: 'Refund order #ORD-1002 for $65.00',\n  sender: 'ana.bootcamp@example.com'\n};\nif (!/^https:\\/\\//.test(config.threshold_url)) throw new Error('Configure an HTTPS Threshold URL reachable from n8n Cloud');\nfor (const key of ['portal_id','ticket_id']) if (!/^[0-9]{1,32}$/.test(config[key])) throw new Error('Configure ' + key);\nconst event_id = 'hubspot:' + config.portal_id + ':ticket:' + config.ticket_id;\nconst payload = {text: config.text, sender: config.sender, external_id: event_id,\n  crm: {provider:'hubspot', portal_id:config.portal_id, ticket_id:config.ticket_id}};\nconst raw_body = JSON.stringify(payload);\nconst timestamp = String(Math.floor(Date.now()/1000));\nreturn [{json: {url:config.threshold_url, event_id, raw_body, timestamp,\n  signed_text:timestamp + '.' + raw_body}}];"
       },
       "id": "026615e3-2187-4c61-88b7-a3b335d56ffe",
       "name": "Demo Request",
@@ -29,7 +29,10 @@
       "parameters": {
         "action": "hmac",
         "value": "={{ $json.signed_text }}",
-        "dataPropertyName": "signature"
+        "dataPropertyName": "signature",
+        "type": "SHA256",
+        "encoding": "hex",
+        "binaryData": false
       },
       "id": "f640976e-73b5-4883-96af-936abc3c51dc",
       "name": "Sign Intake",
@@ -39,12 +42,8 @@
         448,
         0
       ],
-      "credentials": {
-        "crypto": {
-          "id": "nhrTsQHoQAX080lG",
-          "name": "Threshold Intake HMAC"
-        }
-      }
+      "notes": "Select a dedicated Crypto credential named Threshold Intake HMAC using the n8n_intake deployment secret. Use a separate credential for outcome verification.",
+      "notesInFlow": true
     },
     {
       "parameters": {
@@ -109,16 +108,7 @@
       ]
     }
   ],
-  "pinData": {
-    "Manual Start": [
-      {
-        "json": {},
-        "pairedItem": {
-          "item": 0
-        }
-      }
-    ]
-  },
+  "pinData": {},
   "connections": {
     "Manual Start": {
       "main": [
@@ -170,11 +160,5 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "14ce0913-35e2-4ddc-b9b5-1faf7efdca8b",
-  "meta": {
-    "instanceId": "dce9cda768650d75e34f71dc966e86b8c30e5933cf31473cc80482d7c0ff4aff"
-  },
-  "nodeGroups": [],
-  "id": "xarSHWG1jrFSfBNz",
   "tags": []
 }

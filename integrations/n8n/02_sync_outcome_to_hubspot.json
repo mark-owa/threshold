@@ -20,12 +20,8 @@
         0
       ],
       "webhookId": "ea0fb505-faa9-40f5-8beb-fda36e897e53",
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "IGEEcDq4rMuWQXIP",
-          "name": "Header Auth account"
-        }
-      }
+      "notes": "Select Header Auth with Name X-Threshold-Token and Value set to the n8n_outcome deployment secret.",
+      "notesInFlow": true
     },
     {
       "parameters": {
@@ -44,7 +40,10 @@
       "parameters": {
         "action": "hmac",
         "value": "={{ $json.signed_text }}",
-        "dataPropertyName": "expected_signature"
+        "dataPropertyName": "expected_signature",
+        "type": "SHA256",
+        "encoding": "hex",
+        "binaryData": false
       },
       "id": "1118ee4d-6c90-400c-b5f8-0eac39fcfe94",
       "name": "Calculate Outcome Signature",
@@ -54,16 +53,12 @@
         448,
         0
       ],
-      "credentials": {
-        "crypto": {
-          "id": "B2yeneGRcGTdT7Mf",
-          "name": "Threshold Outcome HMAC"
-        }
-      }
+      "notes": "Select a separate Crypto credential named Threshold Outcome HMAC using the n8n_outcome deployment secret. Its secret must match Receive Outcome Header Auth.",
+      "notesInFlow": true
     },
     {
       "parameters": {
-        "jsCode": "// Configure for ONE Threshold organization and ONE HubSpot account.\nconst config = {\n  organization_id: '9a6f3a10-8d33-42a1-9586-cebb8e65d5e4',\n  portal_id: '247531757',\n  completed_stage_id: '4',\n  cancelled_stage_id: '4'\n};\nconst p = $json.payload;\nconst supplied = String($json.supplied_signature || '').replace(/^sha256=/,'');\nconst expected = String($json.expected_signature || '');\nif (!/^[a-f0-9]{64}$/.test(supplied) || !/^[a-f0-9]{64}$/.test(expected)) throw new Error('Invalid signature');\nlet diff = 0;\nfor (let i=0; i<64; i++) diff |= supplied.charCodeAt(i) ^ expected.charCodeAt(i);\nif (diff !== 0) throw new Error('Invalid signature');\nif (!p || p.schema_version !== 1 || p.type !== 'threshold.refund.final') throw new Error('Unsupported outcome');\nif (p.organization_id !== config.organization_id || p.crm?.portal_id !== config.portal_id || p.crm?.provider !== 'hubspot') throw new Error('Organization or CRM account mismatch');\nif (!/^[0-9]{1,32}$/.test(p.crm.ticket_id || '')) throw new Error('Invalid ticket ID');\nif (!['completed','cancelled'].includes(p.status) || (p.status === 'completed' && p.verified !== true)) throw new Error('Outcome not final or verified');\nif (typeof p.delivery_id !== 'string' || p.delivery_id !== $json.header_delivery_id) throw new Error('Delivery ID mismatch');\nconst stage = p.status === 'completed' ? config.completed_stage_id : config.cancelled_stage_id;\nif (!/^[0-9]+$/.test(stage)) throw new Error('Configure the HubSpot internal stage IDs');\nreturn [{json:{delivery_id:p.delivery_id, ticket_id:p.crm.ticket_id,\n properties:{hs_pipeline_stage:stage}}}];"
+        "jsCode": "// Configure for ONE Threshold organization and ONE HubSpot account.\nconst config = {\n  organization_id: 'REPLACE_WITH_THRESHOLD_ORG_UUID',\n  portal_id: 'REPLACE_WITH_HUBSPOT_PORTAL_ID',\n  completed_stage_id: 'REPLACE_WITH_RESOLVED_STAGE_ID',\n  cancelled_stage_id: 'REPLACE_WITH_REJECTED_STAGE_ID'\n};\nconst p = $json.payload;\nconst supplied = String($json.supplied_signature || '').replace(/^sha256=/,'');\nconst expected = String($json.expected_signature || '');\nif (!/^[a-f0-9]{64}$/.test(supplied) || !/^[a-f0-9]{64}$/.test(expected)) throw new Error('Invalid signature');\nlet diff = 0;\nfor (let i=0; i<64; i++) diff |= supplied.charCodeAt(i) ^ expected.charCodeAt(i);\nif (diff !== 0) throw new Error('Invalid signature');\nif (!p || p.schema_version !== 1 || p.type !== 'threshold.refund.final') throw new Error('Unsupported outcome');\nif (p.organization_id !== config.organization_id || p.crm?.portal_id !== config.portal_id || p.crm?.provider !== 'hubspot') throw new Error('Organization or CRM account mismatch');\nif (!/^[0-9]{1,32}$/.test(p.crm.ticket_id || '')) throw new Error('Invalid ticket ID');\nif (!['completed','cancelled'].includes(p.status) || (p.status === 'completed' && p.verified !== true)) throw new Error('Outcome not final or verified');\nif (typeof p.delivery_id !== 'string' || p.delivery_id !== $json.header_delivery_id) throw new Error('Delivery ID mismatch');\nconst stage = p.status === 'completed' ? config.completed_stage_id : config.cancelled_stage_id;\nif (!/^[0-9]+$/.test(stage)) throw new Error('Configure the HubSpot internal stage IDs');\nreturn [{json:{delivery_id:p.delivery_id, ticket_id:p.crm.ticket_id,\n properties:{hs_pipeline_stage:stage}}}];"
       },
       "id": "342fafa0-f8be-4bd5-887e-5e68dde4b648",
       "name": "Validate and Map Outcome",
@@ -107,12 +102,8 @@
         880,
         0
       ],
-      "credentials": {
-        "httpBearerAuth": {
-          "id": "98rIwwbamFhrzoKL",
-          "name": "Bearer Auth account 2"
-        }
-      }
+      "notes": "Select a HubSpot Bearer Auth credential with permission to update tickets.",
+      "notesInFlow": true
     },
     {
       "parameters": {
@@ -222,7 +213,7 @@
       ]
     }
   },
-  "active": true,
+  "active": false,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
@@ -230,12 +221,5 @@
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
   },
-  "versionId": "07df01a9-7dcd-4da2-bc2f-88f3203ac9ca",
-  "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "dce9cda768650d75e34f71dc966e86b8c30e5933cf31473cc80482d7c0ff4aff"
-  },
-  "nodeGroups": [],
-  "id": "fT7JTyyqT7oe7UVP",
   "tags": []
 }
