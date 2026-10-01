@@ -1,47 +1,49 @@
 {
-  "name": "Threshold \u2014 01_submit_refund",
+  "name": "Threshold — 01_submit_refund",
   "nodes": [
     {
       "parameters": {},
-      "id": "bbd3eaaa-e911-567f-9ddc-523aabbe3fce",
+      "id": "90788856-51f8-47b5-bc27-c051668dc4c3",
       "name": "Manual Start",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
         0,
-        300
+        0
       ]
     },
     {
       "parameters": {
         "jsCode": "// Edit only these non-secret values. Use one dedicated test ticket per request.\nconst config = {\n  threshold_url: 'REPLACE_WITH_THRESHOLD_WEBHOOK_URL',\n  portal_id: 'REPLACE_WITH_HUBSPOT_PORTAL_ID',\n  ticket_id: 'REPLACE_WITH_EXISTING_TEST_TICKET_ID',\n  text: 'Refund order #ORD-1002 for $65.00',\n  sender: 'ana.bootcamp@example.com'\n};\nif (!/^https:\\/\\//.test(config.threshold_url)) throw new Error('Configure an HTTPS Threshold URL reachable from n8n Cloud');\nfor (const key of ['portal_id','ticket_id']) if (!/^[0-9]{1,32}$/.test(config[key])) throw new Error('Configure ' + key);\nconst event_id = 'hubspot:' + config.portal_id + ':ticket:' + config.ticket_id;\nconst payload = {text: config.text, sender: config.sender, external_id: event_id,\n  crm: {provider:'hubspot', portal_id:config.portal_id, ticket_id:config.ticket_id}};\nconst raw_body = JSON.stringify(payload);\nconst timestamp = String(Math.floor(Date.now()/1000));\nreturn [{json: {url:config.threshold_url, event_id, raw_body, timestamp,\n  signed_text:timestamp + '.' + raw_body}}];"
       },
-      "id": "18522211-57f7-51ae-94ed-c1486419c3a2",
+      "id": "026615e3-2187-4c61-88b7-a3b335d56ffe",
       "name": "Demo Request",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        220,
-        300
+        224,
+        0
       ]
     },
     {
       "parameters": {
         "action": "hmac",
-        "type": "SHA256",
         "value": "={{ $json.signed_text }}",
         "dataPropertyName": "signature",
+        "type": "SHA256",
         "encoding": "hex",
         "binaryData": false
       },
-      "id": "7c2dd885-b105-5dc4-869a-b4096aa47563",
+      "id": "f640976e-73b5-4883-96af-936abc3c51dc",
       "name": "Sign Intake",
       "type": "n8n-nodes-base.crypto",
       "typeVersion": 2,
       "position": [
-        440,
-        300
-      ]
+        448,
+        0
+      ],
+      "notes": "Select a dedicated Crypto credential named Threshold Intake HMAC using the n8n_intake deployment secret. Use a separate credential for outcome verification.",
+      "notesInFlow": true
     },
     {
       "parameters": {
@@ -69,7 +71,6 @@
         "rawContentType": "application/json",
         "body": "={{ $json.raw_body }}",
         "options": {
-          "timeout": 10000,
           "redirect": {
             "redirect": {
               "followRedirects": false
@@ -78,35 +79,36 @@
           "response": {
             "response": {
               "fullResponse": true,
-              "neverError": true,
-              "responseFormat": "json"
+              "neverError": true
             }
-          }
+          },
+          "timeout": 10000
         }
       },
-      "id": "f465a2fb-d8a5-50de-b2c7-8e40e4d82550",
+      "id": "3112180d-b65c-4067-91ee-d1087b91d73d",
       "name": "Submit to Threshold",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        660,
-        300
+        672,
+        0
       ]
     },
     {
       "parameters": {
-        "jsCode": "if ($json.statusCode !== 202 || $json.body?.accepted !== true) {\n throw new Error('Threshold intake failed: HTTP ' + $json.statusCode + '. Check configuration or EVENT_ID_CONFLICT.');\n}\nreturn [{json:{accepted:true, duplicate:$json.body.duplicate,\n event_id:$json.body.event_id, message:'Accepted for processing. This is not a refund success confirmation.'}}];"
+        "jsCode": "const statusCode = Number($json.statusCode);\nlet body = $json.body;\n\nif (typeof body === 'string') {\n  try {\n    body = JSON.parse(body);\n  } catch {\n    throw new Error('Threshold returned a body that is not valid JSON.');\n  }\n}\n\nif (statusCode !== 202 || body?.accepted !== true) {\n  throw new Error(\n    'Unexpected Threshold response: ' +\n    JSON.stringify({\n      statusCode: $json.statusCode,\n      body_type: typeof $json.body,\n      body: $json.body ?? null,\n      response_keys: Object.keys($json)\n    })\n  );\n}\n\nreturn [{\n  json: {\n    accepted: true,\n    duplicate: body.duplicate,\n    event_id: body.event_id,\n    message: 'Accepted for processing; completion must be verified separately.'\n  }\n}];"
       },
-      "id": "0bea42bc-f21f-5fec-97dd-0d0cbd3e67fb",
+      "id": "b00a8965-1287-4f88-a059-870c5db995a5",
       "name": "Check Acceptance",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         880,
-        300
+        0
       ]
     }
   ],
+  "pinData": {},
   "connections": {
     "Manual Start": {
       "main": [
@@ -156,9 +158,7 @@
   "active": false,
   "settings": {
     "executionOrder": "v1",
-    "saveDataSuccessExecution": "none",
-    "saveDataErrorExecution": "none",
-    "saveManualExecutions": false
+    "binaryMode": "separate"
   },
-  "pinData": {}
+  "tags": []
 }
