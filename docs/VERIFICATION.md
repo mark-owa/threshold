@@ -3,9 +3,29 @@
 Updated on **2026-10-01** against canonical source and dated CI/capture evidence.
 Results below describe particular commits and environments.
 
+## Dependency remediation
+
+The [successful CI run at `8f966fc`](https://github.com/mark-owa/threshold/actions/runs/36820489132) on **2026-10-01**
+verifies the upgrade from PyJWT 2.13.0 to **2.15.1** in canonical
+`backend/requirements.txt`. The Python audit reports **no known vulnerabilities**
+without ignored findings. A separate local audit resolved 59 packages and also
+reported zero findings.
+
+The PostgreSQL-backed suite passed **177 tests** with **72.29% coverage**, including
+20 security tests. Fifteen new cases cover malformed temporal claims, incorrect
+issuer/audience, invalid signatures, disallowed algorithms, and expiry validation
+after options reuse (GHSA-gvp8-978c-rx2q). Backend lint/types, migrations, frontend
+audit/type/build/template checks, and production Compose syntax also passed.
+Deterministic AI evaluation completed: 12/12, 8/8, and 5/5.
+
+[PyJWT release notes](https://pyjwt.readthedocs.io/en/stable/changelog.html) describe
+the upstream changes. This upgrade changes canonical requirements; the separate
+legacy M8 runtime is outside these checks. Earlier import and audit results below
+remain dated historical evidence.
+
 ## Source import checks
 
-Repeated locally using Python 3.12 and the pinned development dependencies:
+Recorded during the source import using Python 3.12 and the then-pinned development dependencies:
 
 | Check | Result | Scope |
 | --- | --- | --- |
@@ -17,7 +37,7 @@ Repeated locally using Python 3.12 and the pinned development dependencies:
 | n8n template harness | 16 passed | Workflow structure/JavaScript, signatures and acknowledgment guards. |
 | Deterministic evaluation | 12/12, 8/8, 5/5 | Mock classification, adversarial wording, and extraction fixtures. |
 | Alembic revision graph | One head: `e8b0c234f6a8` | Retains the existing billing timestamp defaults migration. |
-| Python dependency audit | Failed | 13 findings in unchanged PyJWT 2.13.0. |
+| Python dependency audit | Failed | 13 findings at the earlier PyJWT 2.13.0 pin. |
 
 PostgreSQL and Docker are unavailable locally. The candidate
 [GitHub Actions run at `98bfeee`](https://github.com/mark-owa/threshold/actions/runs/36803688853)
@@ -28,7 +48,7 @@ lint/type checks, frontend audit/type/build/template checks, and production Comp
 syntax validation passed. The Python audit failed on the same 13 PyJWT findings;
 the following AI evaluation step was skipped. Evaluation was repeated locally.
 
-The subsequent documentation changes do not alter that tested application source.
+These import results describe the earlier dependency pin. The remediation entry above records the upgraded dependency and expanded security tests.
 The import tests do not prove live n8n/HubSpot delivery. The separate browser capture below verifies the stated mock flows.
 
 ## Hosted CI
@@ -36,12 +56,13 @@ The import tests do not prove live n8n/HubSpot delivery. The separate browser ca
 | Evidence | Result | Scope |
 | --- | --- | --- |
 | [2026-09-29, `12bf94a`](https://github.com/mark-owa/threshold/actions/runs/36611807246) | Passed | Backend lint, migrations, compilation, PostgreSQL-backed tests with a 70% coverage floor, Python audit, deterministic evaluation, frontend audit/build, and production Compose syntax. |
+| [2026-10-01, `8f966fc`](https://github.com/mark-owa/threshold/actions/runs/36820489132) | Passed | 177 PostgreSQL-backed tests, 72.29% coverage, Python audit with zero findings, deterministic evaluation, backend lint/types/migrations, frontend audit/type/build/template checks, and Compose syntax. |
 | [2026-10-01, `99d6d03`](https://github.com/mark-owa/threshold/actions/runs/36797036742) | Failed | Backend lint, migrations, compilation, and tests passed. Frontend install/audit/build and Compose syntax passed. Python dependency audit failed; the later AI evaluation step was skipped. |
 
-The October 1 audit reported **13 known vulnerabilities in PyJWT 2.13.0**.
-Its output lists fixes for some findings and no fix version for one finding.
-Dependency remediation requires a separate change and a new audit; no finding is
-suppressed by this documentation update.
+The earlier October 1 audit reported **13 known vulnerabilities in PyJWT 2.13.0**.
+Its output listed fixes for some findings and no fix version for one finding.
+The remediation run above verifies the 2.15.1 pin with zero reported findings,
+including an expiry/options-reuse regression test. No finding is suppressed.
 
 The workflow uses Python 3.12, PostgreSQL 16, Redis 7, and Node 22.
 It runs the API/workflow test suite with native PostgreSQL services, rather than
@@ -109,7 +130,6 @@ documentation review; historical reports must not be treated as current live sta
 
 | Area | What remains |
 | --- | --- |
-| Dependency audit | Resolve reported PyJWT findings and obtain a new passing audit. |
 | Broader UI coverage | Exercise registration, workspace switching, roles, expiry, and action forms beyond the captured mock flows. |
 | Browser behavior | Exercise routed navigation, session expiry, tenant changes, and action forms. |
 | M8 packaging | Build the separate M8 image in CI and compare its patched runtime with canonical source. |

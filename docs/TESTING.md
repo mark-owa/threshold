@@ -64,5 +64,5 @@ checks sign-in, session reload, automatic refund, human approval, and manual ret
 through the current browser UI. It publishes media only after its API assertions
 pass. Worker and Beat are absent. Follow [DEMO](DEMO.md) for the walkthrough.
 
-[VERIFICATION](VERIFICATION.md) links actual results, including the October 1 Python
-audit failure. [HISTORY](HISTORY.md) retains the scope of earlier local checks.
+[VERIFICATION](VERIFICATION.md) links dated results, including the PyJWT 2.15.1
+upgrade, passing dependency audit, and 177-test PostgreSQL run. [HISTORY](HISTORY.md) retains the scope of earlier local checks.

@@ -20,7 +20,7 @@ does not describe current implementation.
 
 ## Remaining work
 
-Resolve the PyJWT dependency audit findings; complete provider-account, worker
+Complete provider-account, worker
 interruption, backup/restore, and alert-delivery drills; consolidate the M8 snapshot
 deployment with canonical source. Refresh tokens, password reset, API-key issuance,
 approval expiry, a general workflow continuation engine, and immutable audit storage
