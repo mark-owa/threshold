@@ -133,6 +133,7 @@ documentation review; historical reports must not be treated as current live sta
 | Broader UI coverage | Exercise registration, workspace switching, roles, expiry, and action forms beyond the captured mock flows. |
 | Browser behavior | Exercise routed navigation, session expiry, tenant changes, and action forms. |
 | M8 packaging | Build the separate M8 image in CI and compare its patched runtime with canonical source. |
+| n8n/HubSpot round trip | Run the ticket API preflight, signed intake, real Worker/Beat delivery, matching CRM acknowledgment, and duplicate submission in a configured practice account. No live round-trip evidence is recorded. |
 | Durable delivery | Exercise persisted intake, outbox publication, worker interruptions, duplicate delivery, and dead-letter recovery together. |
 | Ambiguous provider outcomes | Prove timeout-after-provider-commit, reconciliation, and safe continuation against a test provider. |
 | External accounts | Validate Shopify development-store, Stripe test-mode, and credential-vault lifecycles. |
