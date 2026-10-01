@@ -10,3 +10,15 @@
 8. Set `AI_PROVIDER=openai` or `AI_PROVIDER=anthropic` with a corresponding secret, then use `make eval-live` to compare provider-backed behavior with the deterministic baseline.
 
 The frontend nginx container proxies `/api/*`, `/docs`, and `/openapi.json` to the backend service, keeping the browser on one origin in the Docker demo environment.
+
+## Build sources
+
+Local Compose selects `backend/Dockerfile.dev`; production Compose selects the
+runtime-only backend image. Both build canonical `backend/` and `frontend/` source.
+
+`deploy/m8/` is a legacy deployment snapshot retained for compatibility with the
+previous staging setup. Its image extracts an archive and applies overlays. It
+does not include subsequent canonical source changes, and current CI does not
+build it. Treat a deployment from that directory as a different runtime until it
+has been consolidated and verified. [Historical records](history/README.md) explain
+the earlier staging observations.

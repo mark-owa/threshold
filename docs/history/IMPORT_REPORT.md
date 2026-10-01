@@ -1,3 +1,7 @@
+> Historical report. Statements, test counts, environment limits, and next steps
+> describe the milestone or review recorded below. Current implementation and
+> evidence are in [Scope](../SCOPE.md) and [Verification](../VERIFICATION.md).
+
 # Source import history
 
 The source supplied on October 1, 2026 was assembled on September 30 from a frontend
@@ -23,6 +27,6 @@ The prior dashboard files are replaced by the routed frontend. Old capture
 automation is removed because it targets the previous dashboard; its recordings
 and original source remain available in Git history.
 
-Current commands are in the root [README](../README.md), n8n configuration is in
-[N8N_INTEGRATION](N8N_INTEGRATION.md), and dated results are in
-[VERIFICATION](VERIFICATION.md).
+Current commands are in the root [README](../../README.md), n8n configuration is in
+[N8N_INTEGRATION](../N8N_INTEGRATION.md), and dated results are in
+[VERIFICATION](../VERIFICATION.md).

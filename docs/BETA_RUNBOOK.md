@@ -10,7 +10,7 @@ Use production-equivalent PostgreSQL, Redis, worker, beat, HTTPS ingress, and a 
 alembic upgrade head
 ```
 
-Expected schema revision for Milestone 8: `d7a9b123e5f7`.
+Current canonical schema head: `e8b0c234f6a8`. Confirm it with `alembic heads`.
 
 ## 2. Configure the merchant tenant
 
@@ -38,7 +38,7 @@ Use Stripe test mode. Do not pass `--allow-live-stripe-key` for private-beta val
 Bring up the validation provider overlay:
 
 ```bash
-make beta-validation-up
+docker compose -f docker-compose.yml -f docker-compose.validation.yml up -d --build
 ```
 
 Configure a validation-only Generic REST integration with:

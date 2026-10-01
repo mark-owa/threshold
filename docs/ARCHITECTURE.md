@@ -130,4 +130,4 @@ another attempt's lease.
 The inactive receiver template updates one existing HubSpot ticket. It does not
 execute refunds, create tickets, send messages, or provide a durable receiver inbox.
 Delivery is at least once. See [N8N_INTEGRATION](N8N_INTEGRATION.md) for configuration
-and [N8N_VERIFICATION](N8N_VERIFICATION.md) for test scope.
+and [VERIFICATION](VERIFICATION.md) for test scope.

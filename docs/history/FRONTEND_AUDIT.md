@@ -1,9 +1,13 @@
+> Historical report. Statements, test counts, environment limits, and next steps
+> describe the milestone or review recorded below. Current implementation and
+> evidence are in [Scope](../SCOPE.md) and [Verification](../VERIFICATION.md).
+
 # Frontend audit (pre-overhaul)
 
 This audit was written before the dashboard was restructured. It records what
 existed, what the backend supported, and the decisions that followed.
 The checks below were reported with the uploaded source and were not repeated as
-part of the GitHub import. Current results are in [VERIFICATION](VERIFICATION.md).
+part of the GitHub import. Current results are in [VERIFICATION](../VERIFICATION.md).
 
 ## 1. Architecture as found
 

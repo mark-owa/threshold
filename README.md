@@ -9,22 +9,20 @@ actions. The local demo uses fictional retail data; no real money moves or email
 
 ## Demo
 
-![Threshold operator dashboard](docs/assets/demo/dashboard-overview.png)
+![Threshold operator dashboard](docs/assets/current-demo/dashboard-overview.png)
 
 | Human review | Failure and recovery |
 | --- | --- |
-| ![Refund awaiting approval](docs/assets/demo/approval-required.png) | ![Failed refund and manual recovery](docs/assets/demo/retry-recovery.png) |
+| ![Refund awaiting approval](docs/assets/current-demo/approval-required.png) | ![Failed refund and manual recovery](docs/assets/current-demo/retry-recovery.png) |
 
-![Approval progressing to completion](docs/assets/demo/approval-demo.gif)
+![Approval progressing to completion](docs/assets/current-demo/approval-demo.gif)
 
-These captures were recorded against the real Docker Compose application on
-**2026-09-19**, using the mock provider. They show an earlier dashboard version;
-the current source uses React Router and TanStack Query with dedicated workspace,
-integration, approval, recovery, and billing pages.
-Recovery in the recording was triggered manually, with Worker and Beat stopped.
-[Capture evidence](docs/assets/demo/capture-evidence.json) records the source commit
-and execution IDs. The repository includes screenshots and a GIF; a permanent
-full-video link has not been published.
+These captures show the current routed dashboard, recorded on **2026-10-01**
+against the Docker Compose application with fictional data and mock payments.
+The browser completed an automatic refund, reviewer approval, and manual recovery;
+API checks confirmed the outcomes and recovery's action identity. Worker and Beat
+were stopped. [Capture evidence](docs/assets/current-demo/capture-evidence.json)
+records source commit `94cca19` and checked IDs. [Capture run](https://github.com/mark-owa/threshold/actions/runs/36811368664).
 
 [Three-minute walkthrough](docs/DEMO.md) · [Business case](docs/CASE_STUDY.md) ·
 [Architecture](docs/ARCHITECTURE.md) · [Verification evidence](docs/VERIFICATION.md)
@@ -102,23 +100,17 @@ make frontend-build   # npm ci, TypeScript check, and Vite build; Node.js 22.12+
 For database-free primitive tests, install `backend/requirements-dev.txt` in a
 Python 3.12+ virtual environment and run `make unit-test`.
 
-**Evidence checked on 2026-10-01:** [CI at commit `12bf94a`](https://github.com/mark-owa/threshold/actions/runs/36611807246)
-passed backend lint, migrations, PostgreSQL-backed tests, dependency audits,
-deterministic evaluation, frontend build, and production Compose syntax validation.
-The later [run at `99d6d03`](https://github.com/mark-owa/threshold/actions/runs/36797036742)
-passed tests, migrations, frontend checks, and Compose validation but failed the
-Python dependency audit. Its AI evaluation step was skipped after that failure.
-An earlier green run does not establish that current dependencies pass an audit.
+**Checked on 2026-10-01:** [CI for the current application source](https://github.com/mark-owa/threshold/actions/runs/36803992153)
+applied all nine migrations and passed **162 PostgreSQL-backed tests**, with
+**72.29% coverage**. Backend lint/type checks, frontend audit/type/build checks,
+the n8n template harness, and production Compose syntax validation passed.
 
-The imported dashboard now runs `tsc --noEmit` before Vite, and CI adds backend
-Mypy and the n8n template harness. Local import checks passed the frontend build,
-backend lint/type checks, 68 unit/HTTP tests, and deterministic evaluation. The
-[candidate import CI](https://github.com/mark-owa/threshold/actions/runs/36803688853)
-also applied all nine migrations and passed 162 PostgreSQL-backed tests with
-72.29% coverage. Its Python audit still failed on the same PyJWT findings. CI does
-not build the separate M8 staging image. These checks do not prove live payment
-behavior or worker crash recovery. [Testing](docs/TESTING.md) explains the checks;
-[verification](docs/VERIFICATION.md) records results and remaining gaps.
+The Python dependency audit failed with **13 findings in PyJWT 2.13.0**; the
+following AI evaluation step was skipped. Deterministic evaluation passed locally.
+The separate browser capture above verifies the stated mock flows. These results
+do not prove live payments, worker crash recovery, or the legacy M8 image.
+[Testing](docs/TESTING.md) explains the checks; [Verification](docs/VERIFICATION.md)
+records dated results and remaining gaps.
 
 ## Architecture and extended scope
 
@@ -134,10 +126,11 @@ adapters, trials, usage metering, and a live-execution switch. Those features ar
 private-beta scaffolding. They are not established customer deployments or verified
 production payment infrastructure. The demo workspace always selects mock payments.
 
+[Current scope](docs/SCOPE.md) lists implemented features and remaining work.
 [Architecture](docs/ARCHITECTURE.md) separates demo and provider paths.
 [Reliability](docs/RELIABILITY.md) explains retry and reconciliation boundaries.
-[Staging milestones](docs/STAGING_MILESTONES.md) retain historical deployment reports;
-[Milestone 8](docs/SAAS_MILESTONE_8.md) describes the beta gate and required proof.
+[Historical reports](docs/history/README.md) retain earlier milestones and staging observations;
+[Beta readiness](docs/SAAS_MILESTONE_8.md) describes the beta gate and required proof.
 
 ## Source map
 
@@ -159,7 +152,7 @@ production payment infrastructure. The demo workspace always selects mock paymen
 ## Limitations
 
 - The business case is simulated. No customer success, revenue, or measured savings
-  are claimed. The dashboard's hours-saved metric assumes 15 minutes per automatically
+  are claimed. The API's hours-saved estimate assumes 15 minutes per automatically
   completed workflow.
 - Approval continuation and retries target the reference refund flow, rather than
   arbitrary workflow definitions. Most orchestration still resides in `engine.py`.

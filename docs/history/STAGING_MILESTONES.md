@@ -1,10 +1,14 @@
+> Historical report. Statements, test counts, environment limits, and next steps
+> describe the milestone or review recorded below. Current implementation and
+> evidence are in [Scope](../SCOPE.md) and [Verification](../VERIFICATION.md).
+
 # Threshold — Staging to Private Beta Milestones
 
 **Historical staging report, September 2026.** These observations describe the
 separate M8 runtime deployed at that time. Service health, credentials, and recovery
 drills were not rerun during the October 1 documentation review. Recorded PASS
 statuses apply only to their stated scope; incomplete exit criteria remain pending.
-Current canonical CI has no M8 image-build job. See [VERIFICATION](VERIFICATION.md).
+Current canonical CI has no M8 image-build job. See [VERIFICATION](../VERIFICATION.md).
 
 Status legend: `TODO` · `IN PROGRESS` · `BLOCKED` · `PASS`
 

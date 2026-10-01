@@ -70,7 +70,7 @@ They do not establish broker delivery or worker restart recovery.
 Historical M8 staging reports include Redis-interruption observations, but several
 provider and duplicate-delivery exit criteria remain incomplete. M8 uses a frozen
 runtime plus build overlays and can differ from canonical source. See
-[VERIFICATION](VERIFICATION.md) and [STAGING_MILESTONES](STAGING_MILESTONES.md).
+[VERIFICATION](VERIFICATION.md) and [STAGING_MILESTONES](history/STAGING_MILESTONES.md).
 
 Before live use, test timeout-after-provider-commit, duplicate delivery, worker loss,
 outbox failure, and reconciliation together against disposable test infrastructure.

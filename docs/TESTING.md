@@ -59,9 +59,10 @@ Mock fixture results do not establish live-model accuracy or prompt-injection re
 
 The current CI deployment job validates production Compose syntax.
 It does not start the production stack or build `deploy/m8/Dockerfile`.
-The September capture workflow checked a disposable demo with manual retry.
-Its selectors target the earlier dashboard and are not retained as current
-automation after this import. Follow [DEMO](DEMO.md) for a new walkthrough.
+The [capture tooling](../tooling/capture/README.md) starts a disposable demo and
+checks sign-in, session reload, automatic refund, human approval, and manual retry
+through the current browser UI. It publishes media only after its API assertions
+pass. Worker and Beat are absent. Follow [DEMO](DEMO.md) for the walkthrough.
 
 [VERIFICATION](VERIFICATION.md) links actual results, including the October 1 Python
 audit failure. [HISTORY](HISTORY.md) retains the scope of earlier local checks.

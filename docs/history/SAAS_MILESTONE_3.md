@@ -1,3 +1,7 @@
+> Historical report. Statements, test counts, environment limits, and next steps
+> describe the milestone or review recorded below. Current implementation and
+> evidence are in [Scope](../SCOPE.md) and [Verification](../VERIFICATION.md).
+
 # Threshold SaaS Milestone 3 — Live execution boundary
 
 Milestone 3 replaces the prototype's hard-wired mock payment behavior with a provider boundary that can execute a real refund-style HTTP contract while preserving the demo sandbox.

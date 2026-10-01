@@ -1,3 +1,7 @@
+> Historical report. Statements, test counts, environment limits, and next steps
+> describe the milestone or review recorded below. Current implementation and
+> evidence are in [Scope](../SCOPE.md) and [Verification](../VERIFICATION.md).
+
 # SaaS Milestone 7 — Production and Security Hardening
 
 Milestone 7 freezes feature expansion and hardens the private-beta boundary.

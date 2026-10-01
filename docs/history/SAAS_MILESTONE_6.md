@@ -1,3 +1,7 @@
+> Historical report. Statements, test counts, environment limits, and next steps
+> describe the milestone or review recorded below. Current implementation and
+> evidence are in [Scope](../SCOPE.md) and [Verification](../VERIFICATION.md).
+
 # SaaS Milestone 6 — Commercialization
 
 Milestone 6 adds the commercial control plane around Threshold's ecommerce execution engine.

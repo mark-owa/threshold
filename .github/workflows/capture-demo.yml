@@ -1,0 +1,91 @@
+name: Capture current dashboard
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      COMPOSE_PROJECT_NAME: threshold-capture
+      CAPTURE_BRANCH: ${{ github.head_ref || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Start disposable demo
+        run: |
+          cp .env.example .env
+          docker compose up -d --build postgres redis backend frontend
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://localhost:5173/health; then break; fi
+            sleep 2
+          done
+          curl -fsS http://localhost:5173/health
+          docker compose exec -T backend alembic upgrade head
+          curl -fsS http://localhost:8000/ready
+          docker compose exec -T backend python -m scripts.seed_demo_org
+      - name: Install capture tools
+        working-directory: tooling/capture
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npx agent-browser install
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+      - name: Inspect login page
+        working-directory: tooling/capture
+        run: |
+          npx agent-browser open http://localhost:5173
+          npx agent-browser snapshot -i
+          npx agent-browser close
+      - name: Capture and verify mock flows
+        working-directory: tooling/capture
+        run: CAPTURE_SOURCE_COMMIT=$(git rev-parse HEAD) npm run capture
+      - name: Upload verified captures
+        uses: actions/upload-artifact@v4
+        with:
+          name: threshold-current-dashboard
+          path: tooling/capture/output/publish/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Commit verified captures
+        run: |
+          mkdir -p docs/assets/current-demo
+          cp tooling/capture/output/publish/* docs/assets/current-demo/
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/assets/current-demo
+          if ! git diff --cached --quiet; then
+            git commit -m 'Capture current Threshold dashboard and verify mock flows'
+            git push origin "HEAD:$CAPTURE_BRANCH"
+          fi
+      - name: Collect diagnostics
+        if: always()
+        run: |
+          mkdir -p capture-diagnostics
+          docker compose ps > capture-diagnostics/services.txt
+          docker compose logs --no-color > capture-diagnostics/compose.log
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: threshold-capture-diagnostics
+          path: |
+            capture-diagnostics/
+            tooling/capture/output/failure.png
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Stop disposable demo
+        if: always()
+        run: docker compose down --volumes

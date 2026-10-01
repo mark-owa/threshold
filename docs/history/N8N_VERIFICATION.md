@@ -1,8 +1,12 @@
+> Historical report. Statements, test counts, environment limits, and next steps
+> describe the milestone or review recorded below. Current implementation and
+> evidence are in [Scope](../SCOPE.md) and [Verification](../VERIFICATION.md).
+
 # Historical frontend + n8n merge verification — 30 September 2026
 
 These are reported checks bundled with the September 30 source archive. Current
 GitHub import checks and native PostgreSQL evidence are recorded in
-[VERIFICATION](VERIFICATION.md). The old environment limitations and counts below
+[VERIFICATION](../VERIFICATION.md). The old environment limitations and counts below
 describe that earlier packaging review.
 
 | Check | Result | Evidence boundary |

@@ -1,3 +1,7 @@
+> Historical report. Statements, test counts, environment limits, and next steps
+> describe the milestone or review recorded below. Current implementation and
+> evidence are in [Scope](../SCOPE.md) and [Verification](../VERIFICATION.md).
+
 # Threshold SaaS Build — Milestone 2
 
 Threshold is being evolved in-place from the portfolio demo into a tenant-aware business SaaS. The original deterministic workflow engine and isolated demo sandbox remain intact.

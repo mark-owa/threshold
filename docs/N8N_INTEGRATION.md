@@ -214,7 +214,7 @@ This implementation does not prove live-provider readiness. It does not change
 Threshold's existing payment safety gates. PostgreSQL integration tests, worker
 interruption tests, and a live n8n/HubSpot demonstration remain required. The merged
 build also exercises a real local HTTP receiver; that does not establish n8n/CRM
-runtime behavior. See N8N_VERIFICATION.md for the current evidence.
+runtime behavior. See [VERIFICATION](VERIFICATION.md) for current evidence and [historical n8n checks](history/N8N_VERIFICATION.md) for the earlier packaging review.
 
 ## Reference documentation checked during implementation
 

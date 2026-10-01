@@ -1,3 +1,7 @@
+> Historical report. Statements, test counts, environment limits, and next steps
+> describe the milestone or review recorded below. Current implementation and
+> evidence are in [Scope](../SCOPE.md) and [Verification](../VERIFICATION.md).
+
 # SaaS Milestone 5 — Shopify + Stripe ecommerce vertical
 
 Threshold now has provider-specific ecommerce boundaries rather than treating every live action as generic REST.

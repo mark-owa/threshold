@@ -1,3 +1,7 @@
+> Historical report. Statements, test counts, environment limits, and next steps
+> describe the milestone or review recorded below. Current implementation and
+> evidence are in [Scope](../SCOPE.md) and [Verification](../VERIFICATION.md).
+
 # Threshold SaaS Milestone 4 — Production Durability & Recovery
 
 Milestone 4 moves Threshold's live execution path from "queue a task and hope the handoff survives" to an explicit durable-delivery model.
