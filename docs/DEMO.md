@@ -47,10 +47,10 @@ check that no terminal or settings panel exposes real credentials.
 
 | Time | On-screen action | Suggested narration |
 |---|---|---|
-| 0:00–0:20 | Show the dashboard and controlled-demo controls. | “Threshold demonstrates how an internal refund request can move through policy checks, human review, and observable recovery. The retailer and all payment effects here are simulated.” |
-| 0:20–0:55 | Click **Low-risk refund**. Show completion, then the rules, risk, execute, and verify outputs. | “This $65 request refers to an eligible seeded order. The configured automatic limit is $75. The system validates the amount and records a mock refund and its outcome.” |
-| 0:55–1:35 | Click **High-risk refund**. Show the approval queue, then click **Approve** and inspect the result. | “This $89.99 request exceeds the automatic limit. The workflow pauses. An authorized reviewer decides whether it should continue; the action still validates the order and amount.” |
-| 1:35–2:20 | Click **Failure + retry**. Show the error; click **Retry failed action** and show the successful retry output and its action identifier. | “This scenario creates a separate demo order and injects one timeout. I am triggering recovery manually. The retry updates the same action row and records success; no real payment request is sent.” |
+| 0:00–0:20 | Show the dashboard and open **Scenarios**. | “Threshold demonstrates how an internal refund request can move through policy checks, human review, and observable recovery. The retailer and all payment effects here are simulated.” |
+| 0:20–0:55 | Select **Run scenario** under **Low-risk refund**. Open its execution and inspect rules, risk, action, and verification outputs. | “This $65 request refers to an eligible seeded order. The configured automatic limit is $75. The system validates the amount and records a mock refund and its outcome.” |
+| 0:55–1:35 | Run **High-risk refund**. Open Approvals, approve the request, and inspect its execution. | “This $89.99 request exceeds the automatic limit. The workflow pauses. An authorized reviewer decides whether it should continue; the action still validates the order and amount.” |
+| 1:35–2:20 | Run **Provider failure**. Open its execution, trigger retry, and inspect the recovered action. | “This scenario creates a separate demo order and injects one timeout. I am triggering recovery manually. The retry updates the same action row and records success; no real payment request is sent.” |
 | 2:20–2:45 | Show the execution timeline and audit feed. | “Request identity and business-action identity are separate. Repeated delivery can reuse an execution, while a new request for the same successful order and amount can reuse an action.” |
 | 2:45–3:00 | Return to the project overview. | “This is a local prototype. Payments and notifications are mocked. Real-provider delivery, crash recovery, and production payment safety would need additional work.” |
 
@@ -64,7 +64,7 @@ their full payloads. Compare API payloads to confirm action identity.
 
 ## Optional second clip: rejection
 
-Click **Policy-failing refund**. Explain that $150 exceeds the seeded order total.
+Run **Refund likely to be rejected**. Explain that $150 exceeds the seeded order total.
 Select **Reject** and show the cancelled execution. Approval is an operator decision;
 the presence of an approval button does not make an invalid amount executable.
 

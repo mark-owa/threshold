@@ -1,12 +1,12 @@
-# Merged build change inventory
+# Historical n8n merge inventory — September 30, 2026
 
-The frontend-overhaul ZIP is the base. Neither original archive was modified.
-All 73 frontend files are byte-identical; no old frontend files were copied.
-No source files or migrations were removed. Generated caches are excluded.
+This inventory accompanied the supplied archive. It describes that merge relative
+to its frontend-overhaul base, not the later GitHub import. Current import changes
+and retained fixes are summarized in [IMPORT_REPORT](IMPORT_REPORT.md).
 
 ## Added files
 
-- `MERGE_REPORT.md`
+- `MERGE_REPORT.md` (packaging report, now summarized in `docs/IMPORT_REPORT.md`)
 - `START_HERE_N8N.md`
 - `backend/app/services/outcomes.py`
 - `backend/scripts/setup_n8n_bridge.py`
@@ -71,4 +71,5 @@ No source files or migrations were removed. Generated caches are excluded.
 - `docs/ARCHITECTURE.md`
 
 Beyond the n8n merge, backend changes fix existing Ruff/type findings. Most extra
-files have import/formatting cleanup only. See MERGE_REPORT.md for behavior repairs.
+files had import/formatting cleanup only. See [IMPORT_REPORT](IMPORT_REPORT.md)
+for historical verification scope and the safeguards retained during import.

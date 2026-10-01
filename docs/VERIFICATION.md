@@ -19,9 +19,17 @@ Repeated locally using Python 3.12 and the pinned development dependencies:
 | Alembic revision graph | One head: `e8b0c234f6a8` | Retains the existing billing timestamp defaults migration. |
 | Python dependency audit | Failed | 13 findings in unchanged PyJWT 2.13.0. |
 
-PostgreSQL and Docker are unavailable locally. Database-backed tests and migration
-application are checked through candidate GitHub Actions before main is updated.
-The current import is not proof of live n8n/HubSpot delivery or browser behavior.
+PostgreSQL and Docker are unavailable locally. The candidate
+[GitHub Actions run at `98bfeee`](https://github.com/mark-owa/threshold/actions/runs/36803688853)
+applied all nine migrations on PostgreSQL 16 and passed **162 tests**, with
+**72.29% statement coverage** (70% required). That includes the bridge persistence
+tests and retained workflow, provider, billing, and security regressions. Backend
+lint/type checks, frontend audit/type/build/template checks, and production Compose
+syntax validation passed. The Python audit failed on the same 13 PyJWT findings;
+the following AI evaluation step was skipped. Evaluation was repeated locally.
+
+The subsequent documentation changes do not alter that tested application source.
+The import is not proof of live n8n/HubSpot delivery or browser behavior.
 
 ## Hosted CI
 

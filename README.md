@@ -78,7 +78,7 @@ automatically migrated by the seed script. API documentation is at
 http://localhost:8000/docs; `/health` checks the API process and `/ready` checks
 database reachability.
 
-Try **Low-risk refund**, **High-risk refund**, and **Failure + retry**. The seeded
+Open **Scenarios** and run **Low-risk refund**, **High-risk refund**, and **Provider failure**. The seeded
 policy has a $75 automatic limit and a 30-day window. Old seeded orders can age out
 of that window. The failure scenario creates a fresh mock order and injects one
 timeout; use Retry for immediate recovery or allow Beat to schedule it. Repeated
@@ -112,7 +112,10 @@ An earlier green run does not establish that current dependencies pass an audit.
 
 The imported dashboard now runs `tsc --noEmit` before Vite, and CI adds backend
 Mypy and the n8n template harness. Local import checks passed the frontend build,
-backend lint/type checks, 68 unit/HTTP tests, and deterministic evaluation. CI does
+backend lint/type checks, 68 unit/HTTP tests, and deterministic evaluation. The
+[candidate import CI](https://github.com/mark-owa/threshold/actions/runs/36803688853)
+also applied all nine migrations and passed 162 PostgreSQL-backed tests with
+72.29% coverage. Its Python audit still failed on the same PyJWT findings. CI does
 not build the separate M8 staging image. These checks do not prove live payment
 behavior or worker crash recovery. [Testing](docs/TESTING.md) explains the checks;
 [verification](docs/VERIFICATION.md) records results and remaining gaps.
