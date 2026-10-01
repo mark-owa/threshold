@@ -120,21 +120,33 @@ try {
   await retryDialog.getByRole('heading', { name: 'Retry this execution?', exact: true }).waitFor();
   const retry = page.waitForResponse(r => r.url().includes(`/executions/${failure.execution_id}/retry?`) && r.request().method() === 'POST');
   await retryDialog.getByRole('button', { name: 'Retry execution', exact: true }).click();
-  assert.equal((await retry).status(), 200);
-  await page.getByText('execute.retry', { exact: true }).waitFor();
+  const retryResponse = await retry;
+  assert.equal(retryResponse.status(), 200);
+  assert.equal((await retryResponse.json()).status, 'completed');
+  await page.getByText('action_retried_and_verified', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Retry execution', exact: true }).waitFor({ state: 'hidden' });
   const recovered = await api(`ops/executions/${failure.execution_id}?org_id=${org}`);
   assert.equal(recovered.status, 'completed');
   assert(recovered.steps.some(s => s.status === 'failed'));
-  assert(recovered.steps.some(s => s.step_key === 'verify.retry' && s.output?.verified === true));
+  assert.equal(recovered.context.verified, true);
   const audit = await api(`ops/audit?org_id=${org}&limit=200`);
   const failed = audit.find(a => a.execution_id === failure.execution_id && a.event_type === 'action_failed');
   const done = audit.find(a => a.execution_id === failure.execution_id && a.event_type === 'action_retried_and_verified');
   assert(failed && done);
   assert(failed.payload.action_id);
   assert.equal(failed.payload.action_id, done.payload.action_id);
+  const action = await api(`ops/actions/${done.payload.action_id}?org_id=${org}`);
+  assert.equal(action.execution_id, failure.execution_id);
+  assert.equal(action.status, 'succeeded');
+  assert(action.verified_at);
+  assert.equal(action.attempts.length, 2);
+  assert(action.attempts.some(a => a.operation === 'retry' && a.outcome === 'succeeded'));
+  await page.getByText('#2', { exact: true }).waitFor();
   evidence.checks.retry_same_action = {
     execution_id: failure.execution_id, action_id: done.payload.action_id,
     failed_event_id: failed.id, recovered_event_id: done.id, status: recovered.status,
+    action_status: action.status, verified_at: action.verified_at,
+    attempt_count: action.attempts.length,
   };
   await screen('retry-recovery');
   await page.goto(`${base}/overview`);
