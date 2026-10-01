@@ -1,26 +1,28 @@
 # Threshold demonstration and recording guide
 
-Screenshots and an approval GIF from the September 19 mock demo are committed.
-They show an earlier dashboard version and manual retry. A permanent full-video
-link is not published. Use the real application, default mock provider, and
-fictional seeded data for a new recording.
+The current screenshots and approval GIF were recorded on **2026-10-01**, at source
+commit `94cca1901628ee219359872ed28df0799ffebbf4`. The application uses mock AI/payments and fictional seeded data.
+Recovery was manual, with Worker and Beat absent. A permanent narrated walkthrough
+is not published.
 
 ## Existing media
 
 | Asset | File |
 | --- | --- |
-| Dashboard | [Overview](assets/demo/dashboard-overview.png) |
-| Human review | [Approval required](assets/demo/approval-required.png) |
-| Execution steps | [Execution inspector](assets/demo/execution-inspector.png) |
-| Manual recovery | [Retry recovery](assets/demo/retry-recovery.png) |
-| Approval animation | [Approval GIF](assets/demo/approval-demo.gif) |
-| Source and checked IDs | [Capture evidence](assets/demo/capture-evidence.json) |
+| Dashboard | [Overview](assets/current-demo/dashboard-overview.png) |
+| Human review | [Approval required](assets/current-demo/approval-required.png) |
+| Execution steps | [Execution inspector](assets/current-demo/execution-inspector.png) |
+| Manual recovery | [Retry recovery](assets/current-demo/retry-recovery.png) |
+| Approval animation | [Approval GIF](assets/current-demo/approval-demo.gif) |
+| Source and checked IDs | [Capture evidence](assets/current-demo/capture-evidence.json) |
 
-The [successful capture run](https://github.com/mark-owa/threshold/actions/runs/35411976554)
-used source commit `6f0f36a5db6d4f7b8c83f0bf67d1e7e7a967db87`.
-Worker and Beat were stopped. These assets do not prove scheduled delivery, current
-dashboard behavior, or live payments. The workflow generated a time-limited MP4
-artifact; publish a reviewed copy before linking a permanent walkthrough.
+The [capture run](https://github.com/mark-owa/threshold/actions/runs/36811368664) checks browser sign-in, session reload, scenario execution,
+approval confirmation, and retry. API responses confirm final state and the same
+action ID in failure/recovery audit events. This does not verify scheduled broker
+delivery, live payments, or real n8n/HubSpot.
+
+The older September 19 media remains under `assets/demo/`. Its [original capture
+evidence](assets/demo/capture-evidence.json) describes the earlier dashboard.
 
 ## Prepare the real application
 
@@ -62,6 +64,10 @@ in the failure and retry event payloads. Canonical source currently emits
 the previous event naming. The dashboard audit feed displays event labels, not
 their full payloads. Compare API payloads to confirm action identity.
 
+After recovery, the execution is completed and the action is verified. The original
+failed step remains red in the timeline; the provider attempts and audit trail
+record the retry outcome.
+
 ## Optional second clip: rejection
 
 Run **Refund likely to be rejected**. Explain that $150 exceeds the seeded order total.
@@ -69,18 +75,18 @@ Select **Reject** and show the cancelled execution. Approval is an operator deci
 the presence of an approval button does not make an invalid amount executable.
 
 Keep modification demonstrations separate: the API supports modified parameters,
-and the current dashboard includes a modify-and-approve form. The existing
-September capture predates that form.
+and the current dashboard includes a modify-and-approve form. The current capture does not exercise
+modified approval parameters.
 
 ## Capture list
 
 | Asset to refresh | What it must show | Existing destination |
 |---|---|---|
-| Overview screenshot | Authenticated dashboard with a small amount of relevant demo history. | `assets/demo/dashboard-overview.png` |
-| Approval screenshot | The $89.99 request, pending approval, and proposed parameters. | `assets/demo/approval-required.png` |
-| Execution screenshot | Completed workflow with readable rule/action/verification outputs. | `assets/demo/execution-inspector.png` |
-| Recovery screenshot | Failure and verified recovery in the same execution. | `assets/demo/retry-recovery.png` |
-| Short GIF | One approval progressing to completion, with a clear starting state. | `assets/demo/approval-demo.gif` |
+| Overview screenshot | Authenticated dashboard with a small amount of relevant demo history. | `assets/current-demo/dashboard-overview.png` |
+| Approval screenshot | The $89.99 request, pending approval, and proposed parameters. | `assets/current-demo/approval-required.png` |
+| Execution screenshot | Completed workflow with readable rule/action/verification outputs. | `assets/current-demo/execution-inspector.png` |
+| Recovery screenshot | Failure and verified recovery in the same execution. | `assets/current-demo/retry-recovery.png` |
+| Short GIF | One approval progressing to completion, with a clear starting state. | `assets/current-demo/approval-demo.gif` |
 | Full walkthrough | The real three-minute sequence above, with narration or readable captions. | Video attachment or approved video host; link only after upload succeeds. |
 
 Refresh these assets against the current runtime and update the source commit in

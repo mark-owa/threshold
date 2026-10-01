@@ -2,10 +2,6 @@ name: Capture current dashboard
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - '.github/workflows/capture-demo.yml'
-      - 'tooling/capture/**'
 
 permissions:
   contents: write

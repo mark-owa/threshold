@@ -44,4 +44,4 @@ The provider can classify and extract information, but it cannot directly select
 The seeded prompts target an OpenAI model. Set `AI_MODEL` to override their
 model target when using another provider; an explicit workflow-step `model`
 configuration takes precedence. Unknown provider names raise an error.
-Live-provider calls were not made during this review.
+Live-provider behavior requires a separately recorded evaluation with provider credentials.

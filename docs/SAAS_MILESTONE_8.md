@@ -72,7 +72,7 @@ The simulator is validation-only and must never be used as a production provider
 
 ## What still requires real infrastructure
 
-This repository can define and test the gates, but it cannot manufacture evidence. Before real customer data or money is enabled, an operator must still run:
+Before real customer data or money is enabled, an operator must complete and record:
 
 1. full PostgreSQL/Redis/Celery API suite;
 2. production Compose or the actual deployment equivalent;
@@ -87,14 +87,14 @@ This repository can define and test the gates, but it cannot manufacture evidenc
 
 ## Live-execution gate and kill switch
 
-Non-demo workspaces no longer gain live provider authority merely because an integration exists. The organization must have `live_execution_enabled=true` in its tenant settings.
+Non-demo workspaces require `live_execution_enabled=true` in their tenant settings before creating live action intents.
 
 An owner enables it through the beta-readiness control only when the live readiness probe returns zero blockers. Owners/admins can disable it immediately without satisfying any gate.
 
 Both action creation **and the durable worker** enforce the switch. This matters because disabling a workspace after an action has been queued must still stop the provider call. A blocked queued action becomes a known FAILED state without contacting the provider; after the incident is resolved and live execution is re-enabled, the operator may retry it.
 
 The archived M8 staging report describes manual live retries entering the durable
-worker path. Canonical source at `99d6d03` differs: the manual retry endpoint calls
+worker path. Canonical source differs: the manual retry endpoint calls
 `WorkflowEngine.retry_failed_execution`, which invokes the configured provider
 directly. New non-demo action intents and worker recovery use the outbox. Consolidate
 and test these paths before relying on the staging report's manual-retry boundary.

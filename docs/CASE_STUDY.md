@@ -38,8 +38,9 @@ Current and previously reported execution evidence are separated in
   or reject. Authorization comes from organization membership and reviewer role.
 - **Request and action identity are distinct.** Repeating the event key reuses a
   workflow; a new event with the same successful order/amount reuses the action.
-- **A failure stays visible.** The execution retains its context and error. An
-  eligible retry updates the existing action instead of inserting a new refund.
+- **A failure stays visible.** The failed step and provider attempt remain visible
+  after recovery. An eligible retry updates the existing action instead of inserting
+  a new refund.
 
 ## What a client can evaluate
 
@@ -55,10 +56,10 @@ testing; those integrations are not demonstrated here.
 ## Results and limitations
 
 The result is a portfolio prototype with source, tests, and recorded mock-demo
-screenshots and an approval GIF. [Capture evidence](assets/demo/capture-evidence.json)
-identifies the September 19 version; it does not verify every later dashboard change.
-There are no measured business outcomes. The dashboard's
-hours-saved metric assumes 15 minutes per automatically completed execution;
+screenshots and an approval GIF. [Capture evidence](assets/current-demo/capture-evidence.json)
+records the current dashboard mock flows, source commit, and checked execution/action IDs.
+There are no measured business outcomes. The API's
+hours-saved estimate assumes 15 minutes per automatically completed execution;
 reused actions can still contribute completed executions, so it is not verified ROI.
 
 Default classification and extraction use deterministic mock rules. Optional live

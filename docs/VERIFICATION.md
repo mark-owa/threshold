@@ -1,6 +1,6 @@
 # Verification evidence
 
-Updated on **2026-10-01** for the owner-supplied frontend/n8n source import.
+Updated on **2026-10-01** against canonical source and dated CI/capture evidence.
 Results below describe particular commits and environments.
 
 ## Source import checks
@@ -29,7 +29,7 @@ syntax validation passed. The Python audit failed on the same 13 PyJWT findings;
 the following AI evaluation step was skipped. Evaluation was repeated locally.
 
 The subsequent documentation changes do not alter that tested application source.
-The import is not proof of live n8n/HubSpot delivery or browser behavior.
+The import tests do not prove live n8n/HubSpot delivery. The separate browser capture below verifies the stated mock flows.
 
 ## Hosted CI
 
@@ -52,11 +52,27 @@ Tests exercise task functions and mocked provider behavior. A passing job does n
 prove real Celery broker delivery, live API credentials, or production payment safety.
 The earlier frontend jobs ran Vite without a TypeScript check. The imported
 workflow now checks TypeScript before Vite and also runs the n8n template harness.
-Neither workflow runs browser interaction tests.
+The regular CI workflow does not run browser interaction tests. The separate capture workflow verifies the stated mock UI flows.
 The deployment job validates Compose syntax; it does not start the production stack.
 The current workflow has no M8 image-build job.
 
-## Recorded demo
+## Current dashboard capture
+
+The [successful capture run](https://github.com/mark-owa/threshold/actions/runs/36811368664) recorded canonical source `94cca1901628ee219359872ed28df0799ffebbf4` on
+**2026-10-01**, using a fresh Docker Compose database and production React build.
+Chromium signed in as the seeded reviewer, restored the session after reload,
+completed a $65 mock refund, approved the $89.99 request, and manually recovered
+a simulated timeout. API assertions verified final state, retained failed steps,
+and the same action ID in failure/recovery audit events. No browser or API errors
+were recorded.
+
+Four screenshots and an approval GIF are under `docs/assets/current-demo/`.
+[JSON evidence](assets/current-demo/capture-evidence.json) records the source,
+environment, run URL, execution IDs, approval ID, and action/audit IDs.
+Worker and Beat were absent. These checks do not establish broker transport,
+worker crash recovery, live provider safety, or a real n8n/HubSpot round trip.
+
+## Historical September demo
 
 The [capture run](https://github.com/mark-owa/threshold/actions/runs/35411976554)
 completed successfully on **2026-09-19**, at source commit
@@ -94,7 +110,7 @@ documentation review; historical reports must not be treated as current live sta
 | Area | What remains |
 | --- | --- |
 | Dependency audit | Resolve reported PyJWT findings and obtain a new passing audit. |
-| Current UI | Capture the current dashboard and exercise registration, approvals, retry, and workspace views in a browser. |
+| Broader UI coverage | Exercise registration, workspace switching, roles, expiry, and action forms beyond the captured mock flows. |
 | Browser behavior | Exercise routed navigation, session expiry, tenant changes, and action forms. |
 | M8 packaging | Build the separate M8 image in CI and compare its patched runtime with canonical source. |
 | Durable delivery | Exercise persisted intake, outbox publication, worker interruptions, duplicate delivery, and dead-letter recovery together. |
